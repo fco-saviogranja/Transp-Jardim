@@ -26,10 +26,22 @@ function AppContent() {
   
   const { isAuthenticated, loading, user } = useAuth();
   
-  // Estado inicial com fallbacks seguros
-  const [currentView, setCurrentView] = useState('dashboard');
+  // Estado inicial pré-carregado para evitar timeouts
+  const [currentView, setCurrentView] = useState(() => {
+    // Carregar view salva imediatamente
+    try {
+      const savedView = localStorage.getItem('transpjardim-current-view');
+      return ['dashboard', 'criterios', 'alertas', 'admin', 'relatorios'].includes(savedView || '') ? savedView : 'dashboard';
+    } catch {
+      return 'dashboard';
+    }
+  });
+  
   const [alertas, setAlertas] = useState<Alerta[]>(mockAlertas || []);
-  const [criterios, setCriterios] = useState<Criterio[]>([]);
+  const [criterios, setCriterios] = useState<Criterio[]>(() => {
+    // Pré-carregar critérios imediatamente
+    return (mockCriterios || []).map(criterio => ({ ...criterio, meta: 100 }));
+  });
   const [metricas, setMetricas] = useState<Metricas>(mockMetricas || {
     totalCriterios: 0,
     ativas: 0,
@@ -40,110 +52,46 @@ function AppContent() {
     criteriosConcluidos: 0,
     percentualConclusao: 0
   });
-  const [initialized, setInitialized] = useState(false);
-  const [initTimeout, setInitTimeout] = useState(false);
+  const [initialized, setInitialized] = useState(true); // Já inicializado
   const [forceInitialized, setForceInitialized] = useState(false);
 
-  // Inicialização ultra-rápida e segura
+  // Log de inicialização apenas uma vez
   useEffect(() => {
-    if (!initialized) {
-      // Inicialização síncrona e imediata para evitar timeouts
-      try {
-        // Dados mock básicos
-        setAlertas(mockAlertas || []);
-        setCriterios((mockCriterios || []).map(criterio => ({ ...criterio, meta: 100 })));
-        
-        // View salva (síncrono)
-        try {
-          const savedView = localStorage.getItem('transpjardim-current-view');
-          if (['dashboard', 'criterios', 'alertas', 'admin', 'relatorios'].includes(savedView || '')) {
-            setCurrentView(savedView || 'dashboard');
-          }
-        } catch {
-          // Ignorar erros silenciosamente
-        }
-        
-        setInitialized(true);
-        console.log('✅ TranspJardim inicializado (modo rápido)');
-      } catch (error) {
-        console.warn('Erro na inicialização, usando fallback:', error);
-        setInitialized(true);
-      }
-      
-      // Timeout de segurança para forçar inicialização
-      const emergencyTimeout = setTimeout(() => {
-        if (!initialized) {
-          console.warn('⚠️ Forçando inicialização por timeout de segurança');
-          setForceInitialized(true);
-          setInitialized(true);
-          setLoading(false);
-        }
-      }, 3000); // 3 segundos máximo
-      
-      return () => clearTimeout(emergencyTimeout);
-    }
-  }, []); // Dependência vazia para rodar apenas uma vez
-
-  // Monitoramento de memória desabilitado por segurança (pode causar timeouts)
-  useEffect(() => {
-    // Timer de limpeza leve apenas se necessário
-    const lightCleanup = setTimeout(() => {
-      try {
-        if (typeof window !== 'undefined' && window.gc) {
-          window.gc();
-        }
-      } catch {
-        // Ignorar se gc não estiver disponível
-      }
-    }, 30000);
-    
-    return () => {
-      clearTimeout(lightCleanup);
-    };
+    console.log('✅ TranspJardim pré-carregado e pronto!');
   }, []);
 
-  // Carregar completions do usuário de forma assíncrona para evitar bloqueios
+  // Monitoramento de memória completamente desabilitado para evitar timeouts
+
+  // Carregar completions do usuário somente quando necessário
   useEffect(() => {
-    if (user?.id && initialized) {
-      // Usar setTimeout para não bloquear a thread principal
-      const loadCompletions = setTimeout(() => {
+    if (user?.id && initialized && criterios.length > 0) {
+      // Carregar completions de forma extremamente rápida
+      requestAnimationFrame(() => {
         try {
           const storageKey = `transpjardim-user-completions-${user.id}`;
           const savedCompletions = localStorage.getItem(storageKey);
           
           if (savedCompletions) {
             const completions = JSON.parse(savedCompletions);
-            
-            // Usar requestIdleCallback se disponível para melhor performance
-            const updateCriterios = () => {
-              setCriterios(prev => 
-                prev.map(criterio => {
-                  const completion = completions[criterio.id];
-                  return completion ? {
-                    ...criterio,
-                    conclusoesPorUsuario: {
-                      ...criterio.conclusoesPorUsuario,
-                      [user.id]: completion
-                    }
-                  } : criterio;
-                })
-              );
-            };
-            
-            if (typeof window !== 'undefined' && window.requestIdleCallback) {
-              window.requestIdleCallback(updateCriterios);
-            } else {
-              setTimeout(updateCriterios, 0);
-            }
+            setCriterios(prev => 
+              prev.map(criterio => {
+                const completion = completions[criterio.id];
+                return completion ? {
+                  ...criterio,
+                  conclusoesPorUsuario: {
+                    ...criterio.conclusoesPorUsuario,
+                    [user.id]: completion
+                  }
+                } : criterio;
+              })
+            );
           }
-        } catch (error) {
+        } catch {
           // Ignorar erros silenciosamente
         }
-      }, 100);
-      
-      return () => clearTimeout(loadCompletions);
+      });
     }
-  }, [user?.id, initialized]);
+  }, [user?.id, initialized, criterios.length]);
 
   // Navegação otimizada
   const handleViewChange = useCallback((newView: string) => {
@@ -438,38 +386,13 @@ function AppContent() {
     }
   }, [calculatedMetricas, initialized]);
 
-  if ((loading || !initialized) && !forceInitialized) {
+  // Pular tela de loading - sistema pré-carregado
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--jardim-gray-light)]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--jardim-green)] mx-auto mb-4"></div>
-          <p className="text-[var(--jardim-gray)]">
-            {initTimeout ? 'Sistema carregando...' : 'Carregando TranspJardim...'}
-          </p>
-          <div className="mt-4 space-y-2">
-            <button
-              onClick={() => {
-                setForceInitialized(true);
-                setInitialized(true);
-                setLoading(false);
-                // Garantir que há dados mínimos
-                if (criterios.length === 0) {
-                  setCriterios((mockCriterios || []).map(criterio => ({ ...criterio, meta: 100 })));
-                }
-              }}
-              className="block mx-auto px-4 py-2 bg-[var(--jardim-green)] text-white rounded-lg hover:bg-[var(--jardim-green-light)] transition-colors"
-            >
-              Forçar Carregamento
-            </button>
-            {initTimeout && (
-              <button
-                onClick={() => window.location.reload()}
-                className="block mx-auto px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-              >
-                Recarregar Página
-              </button>
-            )}
-          </div>
+          <p className="text-[var(--jardim-gray)]">Carregando autenticação...</p>
         </div>
       </div>
     );

@@ -29,27 +29,18 @@ export const useAuthProvider = () => {
   const supabase = useSupabase();
 
   useEffect(() => {
-    // Carregamento assíncrono para evitar bloquear a thread principal
-    const loadAuth = async () => {
-      try {
-        // Usar setTimeout para não bloquear o carregamento inicial
-        setTimeout(() => {
-          try {
-            const { user: storedUser, token: storedToken } = getStoredAuth();
-            setUser(storedUser);
-            setToken(storedToken);
-          } catch (error) {
-            console.warn('Erro ao carregar autenticação:', error);
-          } finally {
-            setLoading(false);
-          }
-        }, 0);
-      } catch (error) {
-        setLoading(false);
-      }
-    };
-    
-    loadAuth();
+    // Carregamento síncrono e instantâneo da autenticação
+    try {
+      const { user: storedUser, token: storedToken } = getStoredAuth();
+      setUser(storedUser);
+      setToken(storedToken);
+      console.log('🔐 Auth carregado:', storedUser ? 'Logado' : 'Não logado');
+    } catch (error) {
+      console.warn('Erro ao carregar autenticação:', error);
+    } finally {
+      setLoading(false);
+    }
+
   }, []);
 
   const login = async (username: string, password: string): Promise<boolean> => {
