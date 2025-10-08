@@ -53,11 +53,23 @@ export const UserManagement = () => {
       } else {
         console.error('Erro ao carregar usuários:', response.error);
         
-        // Se o backend não está disponível, usar dados mock
+        // Se o backend não está disponível, usar dados mock + dinâmicos
         if (response.error?.includes('Failed to fetch') || 
             response.error?.includes('NetworkError')) {
           setBackendAvailable(false);
-          setUsers(mockUsers);
+          
+          // Carregar usuários dinâmicos criados localmente
+          let dynamicUsers: User[] = [];
+          try {
+            const storedDynamicUsers = localStorage.getItem('transpjardim_dynamic_users');
+            if (storedDynamicUsers) {
+              dynamicUsers = JSON.parse(storedDynamicUsers);
+            }
+          } catch (error) {
+            console.warn('Erro ao carregar usuários dinâmicos:', error);
+          }
+          
+          setUsers([...mockUsers, ...dynamicUsers]);
           toast.error('Backend indisponível. Usando dados de demonstração.');
         } else {
           toast.error('Erro ao carregar usuários');
@@ -66,7 +78,19 @@ export const UserManagement = () => {
     } catch (error) {
       console.error('Erro ao carregar usuários:', error);
       setBackendAvailable(false);
-      setUsers(mockUsers);
+      
+      // Carregar usuários dinâmicos criados localmente
+      let dynamicUsers: User[] = [];
+      try {
+        const storedDynamicUsers = localStorage.getItem('transpjardim_dynamic_users');
+        if (storedDynamicUsers) {
+          dynamicUsers = JSON.parse(storedDynamicUsers);
+        }
+      } catch (error) {
+        console.warn('Erro ao carregar usuários dinâmicos:', error);
+      }
+      
+      setUsers([...mockUsers, ...dynamicUsers]);
       toast.error('Servidor indisponível. Modo demonstração ativado.');
     } finally {
       setLoading(false);
@@ -178,10 +202,29 @@ export const UserManagement = () => {
             username: formData.username,
             email: formData.email,
             role: formData.role,
-            secretaria: formData.role === 'admin' ? undefined : formData.secretaria
+            secretaria: formData.role === 'admin' ? undefined : formData.secretaria,
+            dataCriacao: new Date().toISOString()
           };
+          
+          // Persistir usuário dinâmico para login
+          try {
+            const existingDynamicUsers = localStorage.getItem('transpjardim_dynamic_users');
+            const dynamicUsers = existingDynamicUsers ? JSON.parse(existingDynamicUsers) : [];
+            dynamicUsers.push(newUser);
+            localStorage.setItem('transpjardim_dynamic_users', JSON.stringify(dynamicUsers));
+            
+            // Persistir senha padrão para o usuário
+            const userPasswords = JSON.parse(localStorage.getItem('transpjardim_user_passwords') || '{}');
+            userPasswords[formData.username] = formData.password;
+            localStorage.setItem('transpjardim_user_passwords', JSON.stringify(userPasswords));
+            
+            console.log(`✅ Usuário ${formData.username} persistido com senha`);
+          } catch (error) {
+            console.error('Erro ao persistir usuário dinâmico:', error);
+          }
+          
           setUsers(prev => [...prev, newUser]);
-          toast.success('Usuário criado (modo demonstração)');
+          toast.success(`Usuário "${formData.username}" criado! Senha: "${formData.password}"`);
         }
         handleCloseDialog();
         return;

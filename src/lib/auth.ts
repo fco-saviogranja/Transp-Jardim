@@ -38,10 +38,24 @@ export const clearStoredAuth = () => {
 
 export const validateLogin = (username: string, password: string): User | null => {
   console.log(`🔐 Validando login mock: ${username}`);
-  console.log(`👥 Usuários disponíveis:`, mockUsers.map(u => u.username));
   
-  // Buscar usuário no mock
-  const user = mockUsers.find(u => u.username === username);
+  // Buscar usuários dinâmicos criados no sistema
+  let dynamicUsers: User[] = [];
+  try {
+    const storedDynamicUsers = localStorage.getItem('transpjardim_dynamic_users');
+    if (storedDynamicUsers) {
+      dynamicUsers = JSON.parse(storedDynamicUsers);
+    }
+  } catch (error) {
+    console.warn('Erro ao carregar usuários dinâmicos:', error);
+  }
+  
+  // Combinar usuários mock e dinâmicos
+  const allUsers = [...mockUsers, ...dynamicUsers];
+  console.log(`👥 Usuários disponíveis:`, allUsers.map(u => u.username));
+  
+  // Buscar usuário em todos os usuários
+  const user = allUsers.find(u => u.username === username);
   
   if (!user) {
     console.log(`❌ Usuário ${username} não encontrado no mock`);
@@ -63,7 +77,28 @@ export const validateLogin = (username: string, password: string): User | null =
     'usuario': ['usuario', 'user123', '123']
   };
   
-  const userValidPasswords = validPasswords[username as keyof typeof validPasswords] || ['123'];
+  // Verificar se é usuário dinâmico
+  let userValidPasswords = validPasswords[username as keyof typeof validPasswords] || ['123'];
+  
+  // Para usuários dinâmicos, buscar senha personalizada
+  try {
+    const storedPasswords = localStorage.getItem('transpjardim_user_passwords');
+    if (storedPasswords) {
+      const userPasswords = JSON.parse(storedPasswords);
+      if (userPasswords[username]) {
+        userValidPasswords = [userPasswords[username], '123']; // Incluir '123' como fallback
+        console.log(`🔑 Encontrada senha personalizada para usuário dinâmico: ${username}`);
+      }
+    }
+    
+    // Senha de emergência para usuário franciscosavio (compatibilidade)
+    if (username === 'franciscosavio' && !userValidPasswords.includes('123')) {
+      userValidPasswords = ['123', 'franciscosavio', 'admin'];
+      console.log(`🆘 Aplicando senha de emergência para: ${username}`);
+    }
+  } catch (error) {
+    console.warn('Erro ao carregar senhas de usuários dinâmicos:', error);
+  }
   
   if (userValidPasswords.includes(password)) {
     console.log(`✅ Login mock bem-sucedido para: ${username}`);

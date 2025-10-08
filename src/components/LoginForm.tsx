@@ -28,7 +28,29 @@ export const LoginForm = () => {
       
       if (!success) {
         console.log(`❌ Login falhou para: ${username}`);
-        setError(`Credenciais inválidas para "${username}". Verifique as credenciais de teste abaixo.`);
+        
+        // Verificar se o usuário existe mas a senha está errada
+        const { mockUsers } = await import('../lib/mockData');
+        
+        // Verificar usuários dinâmicos
+        let dynamicUsers: any[] = [];
+        try {
+          const storedDynamicUsers = localStorage.getItem('transpjardim_dynamic_users');
+          if (storedDynamicUsers) {
+            dynamicUsers = JSON.parse(storedDynamicUsers);
+          }
+        } catch (error) {
+          console.warn('Erro ao verificar usuários dinâmicos:', error);
+        }
+        
+        const allUsers = [...mockUsers, ...dynamicUsers];
+        const userExists = allUsers.find(u => u.username === username);
+        
+        if (userExists) {
+          setError(`Senha incorreta para "${username}". Tente "123" ou consulte o administrador.`);
+        } else {
+          setError(`Usuário "${username}" não encontrado. Use uma das credenciais de teste abaixo ou peça para o administrador criar sua conta.`);
+        }
       } else {
         console.log(`✅ Login bem-sucedido para: ${username}`);
       }
@@ -110,10 +132,22 @@ export const LoginForm = () => {
             </Button>
           </form>
 
-          <div className="mt-6 text-center">
+          <div className="mt-6 text-center space-y-2">
             <p className="text-xs text-[var(--jardim-gray)]">
               💡 Entre em contato com a administração para obter suas credenciais de acesso
             </p>
+            <div className="text-xs text-muted-foreground bg-blue-50 p-3 rounded-lg border">
+              <p className="font-medium text-blue-800 mb-1">📋 Credenciais de Teste:</p>
+              <div className="space-y-1 text-blue-700">
+                <p><strong>Admin:</strong> admin / admin</p>
+                <p><strong>Educação:</strong> educacao / 123</p>
+                <p><strong>Saúde:</strong> saude / 123</p>
+                <p><strong>Obras:</strong> obras / 123</p>
+                <p className="text-xs text-blue-600 mt-2">
+                  ℹ️ Usuários criados pelo admin podem usar suas credenciais personalizadas
+                </p>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>

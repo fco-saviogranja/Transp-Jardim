@@ -135,7 +135,7 @@ export function FlexibleEmailTest() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => handleQuickEmail('controleinterno@transparenciajardim.app')}
+            onClick={() => handleQuickEmail('controleinterno@transpjardim.tech')}
             disabled={isSending}
           >
             <Settings className="h-3 w-3 mr-1" />

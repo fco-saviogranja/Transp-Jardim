@@ -95,7 +95,7 @@ export const DomainSetupGuide = () => {
                 <div className="p-4 border rounded-lg bg-gray-50">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h4 className="font-semibold">transparenciajardim.app</h4>
+                      <h4 className="font-semibold">transpjardim.tech</h4>
                       <p className="text-sm text-muted-foreground">
                         Domínio principal do TranspJardim
                       </p>
@@ -107,7 +107,7 @@ export const DomainSetupGuide = () => {
                 <Alert>
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
-                    O domínio transparenciajardim.app não foi encontrado na sua conta Resend.
+                    O domínio transpjardim.tech não foi encontrado na sua conta Resend.
                   </AlertDescription>
                 </Alert>
               )}
@@ -144,7 +144,7 @@ export const DomainSetupGuide = () => {
                   <li>Acesse o painel do Resend</li>
                   <li>Vá para a seção "Domains"</li>
                   <li>Clique em "Add Domain"</li>
-                  <li>Digite: <code className="bg-blue-100 px-1 rounded">transparenciajardim.app</code></li>
+                  <li>Digite: <code className="bg-blue-100 px-1 rounded">transpjardim.tech</code></li>
                 </ol>
               </div>
 
@@ -203,8 +203,8 @@ export const DomainSetupGuide = () => {
           <div className="p-4 border rounded-lg bg-gray-50">
             <h5 className="font-semibold mb-2">Configuração Atual do Sistema:</h5>
             <div className="space-y-1 text-sm text-muted-foreground">
-              <p><strong>E-mail remetente:</strong> controleinterno@transparenciajardim.app</p>
-              <p><strong>Domínio necessário:</strong> transparenciajardim.app</p>
+              <p><strong>E-mail remetente:</strong> controleinterno@transpjardim.tech</p>
+              <p><strong>Domínio necessário:</strong> transpjardim.tech</p>
               <p><strong>Status:</strong> {domainStatus?.domain?.verified ? '✅ Configurado' : '⚠️ Pendente'}</p>
             </div>
           </div>

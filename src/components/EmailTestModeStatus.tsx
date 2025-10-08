@@ -227,7 +227,7 @@ export function EmailTestModeStatus() {
           {testModeInfo.isTestMode && (
             <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-yellow-800">
               <p className="text-xs">
-                💡 <strong>Dica:</strong> Para usar um domínio personalizado como <code>@transparenciajardim.app</code>, 
+                💡 <strong>Dica:</strong> Para usar um domínio personalizado como <code>@transpjardim.tech</code>, 
                 configure o domínio no painel do Resend em resend.com/domains
               </p>
             </div>

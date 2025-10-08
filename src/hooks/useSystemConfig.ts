@@ -43,13 +43,13 @@ export interface SystemConfig {
 export const defaultConfig: SystemConfig = {
   siteName: 'TranspJardim',
   siteDescription: 'Plataforma de Transparência Municipal de Jardim/CE',
-  adminEmail: 'admin@transparenciajardim.app',
+  adminEmail: 'admin@transpjardim.tech',
   timezone: 'America/Fortaleza',
   defaultLanguage: 'pt-BR',
   
   emailNotifications: true,
   pushNotifications: true,
-  alertsEmail: 'alertas@transparenciajardim.app',
+  alertsEmail: 'alertas@transpjardim.tech',
   notificationFrequency: 'daily',
   
   sessionTimeout: 480, // 8 horas em minutos
