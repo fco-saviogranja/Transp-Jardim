@@ -158,10 +158,34 @@ export const useSupabase = () => {
   // ============================================
 
   const login = async (username: string, password: string) => {
-    const response = await apiCall('/auth/login', {
+    let response = await apiCall('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
     });
+    
+    // Se houve erro de dados não inicializados, tentar auto-inicialização
+    if (!response.success && response.error?.includes('inicialização de dados primeiro')) {
+      console.log('Tentando auto-inicialização de dados...');
+      
+      try {
+        const initResponse = await apiCall('/init-data', {
+          method: 'POST',
+        });
+        
+        if (initResponse.success) {
+          console.log('Auto-inicialização bem-sucedida, tentando login novamente...');
+          
+          // Tentar login novamente após inicialização
+          response = await apiCall('/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ username, password }),
+          });
+        }
+      } catch (initError) {
+        console.warn('Falha na auto-inicialização:', initError);
+      }
+    }
+    
     return response;
   };
 

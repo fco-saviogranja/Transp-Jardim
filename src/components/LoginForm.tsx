@@ -132,10 +132,50 @@ export const LoginForm = () => {
             </Button>
           </form>
 
-          <div className="mt-6 text-center space-y-2">
+          <div className="mt-6 text-center space-y-3">
             <p className="text-xs text-[var(--jardim-gray)]">
               💡 Entre em contato com a administração para obter suas credenciais de acesso
             </p>
+            
+            {error?.includes('inicialização') && (
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                <p className="text-xs text-orange-800 mb-2">
+                  ⚠️ Sistema precisa ser inicializado
+                </p>
+                <button
+                  onClick={async () => {
+                    setLoading(true);
+                    try {
+                      const { projectId, publicAnonKey } = await import('../utils/supabase/info');
+                      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-225e1157/init-data`, {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'Authorization': `Bearer ${publicAnonKey}`
+                        }
+                      });
+                      
+                      if (response.ok) {
+                        setError('');
+                        const { toast } = await import('sonner@2.0.3');
+                        toast.success('✅ Sistema inicializado! Tente fazer login novamente.');
+                      } else {
+                        throw new Error('Falha na inicialização');
+                      }
+                    } catch (err) {
+                      setError('Erro ao inicializar sistema. Use as credenciais de teste.');
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  className="text-xs bg-orange-600 text-white px-3 py-1 rounded hover:bg-orange-700 transition-colors"
+                  disabled={loading}
+                >
+                  {loading ? 'Inicializando...' : 'Inicializar Sistema'}
+                </button>
+              </div>
+            )}
+            
             <div className="text-xs text-muted-foreground bg-blue-50 p-3 rounded-lg border">
               <p className="font-medium text-blue-800 mb-1">📋 Credenciais de Teste:</p>
               <div className="space-y-1 text-blue-700">
@@ -143,8 +183,9 @@ export const LoginForm = () => {
                 <p><strong>Educação:</strong> educacao / 123</p>
                 <p><strong>Saúde:</strong> saude / 123</p>
                 <p><strong>Obras:</strong> obras / 123</p>
+                <p><strong>Francisco:</strong> franciscosavio / 123</p>
                 <p className="text-xs text-blue-600 mt-2">
-                  ℹ️ Usuários criados pelo admin podem usar suas credenciais personalizadas
+                  ℹ️ Sistema funciona online e offline
                 </p>
               </div>
             </div>

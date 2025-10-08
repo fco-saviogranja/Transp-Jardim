@@ -35,13 +35,37 @@ const supabase = createClient(supabaseUrl || '', supabaseKey || '');
 // ============================================
 
 // Rota de health check
-app.get('/make-server-225e1157/health', (c) => {
+app.get('/make-server-225e1157/health', async (c) => {
   console.log('Health check solicitado');
+  
+  // Verificar se há dados inicializados
+  let hasData = false;
+  let userCount = 0;
+  try {
+    const adminUser = await kv.get('usuario:admin');
+    if (adminUser) {
+      hasData = true;
+      
+      // Contar usuários (método aproximado)
+      const testUsers = ['admin', 'educacao', 'saude', 'obras', 'ambiente', 'franciscosavio'];
+      for (const username of testUsers) {
+        const user = await kv.get(`usuario:${username}`);
+        if (user) userCount++;
+      }
+    }
+  } catch (error) {
+    console.warn('Erro ao verificar dados:', error);
+  }
+  
   return c.json({ 
     status: 'ok', 
     service: 'TranspJardim API',
     timestamp: new Date().toISOString(),
-    version: '1.0.1',
+    version: '1.0.2',
+    dataStatus: {
+      initialized: hasData,
+      userCount: userCount
+    },
     environment: {
       deno: Deno.version.deno,
       hasSupabaseUrl: !!supabaseUrl,
@@ -177,6 +201,15 @@ app.post('/make-server-225e1157/init-data', async (c) => {
         role: 'padrão',
         secretaria: 'Secretaria de Meio Ambiente',
         email: 'ambiente@transpjardim.tech'
+      },
+      {
+        id: 'user005',
+        name: 'Francisco Savio',
+        username: 'franciscosavio',
+        password: '123',
+        role: 'padrão',
+        secretaria: 'Secretaria de Administração e Finanças',
+        email: 'franciscosavio@transpjardim.tech'
       }
     ];
     
@@ -230,14 +263,106 @@ app.post('/make-server-225e1157/auth/login', async (c) => {
     console.log(`Tentativa de login: ${username}`);
     
     // Buscar usuário
-    const usuario = await kv.get(`usuario:${username}`);
+    let usuario = await kv.get(`usuario:${username}`);
     
     if (!usuario) {
-      console.log(`Usuário não encontrado: ${username}`);
-      return c.json({ 
-        success: false, 
-        error: `Usuário '${username}' não encontrado. Execute a inicialização de dados primeiro.` 
-      }, 401);
+      console.log(`Usuário não encontrado: ${username}. Tentando auto-inicialização...`);
+      
+      // Tentar auto-inicialização se o usuário não existir
+      try {
+        console.log('Executando auto-inicialização de dados...');
+        
+        // Lista de usuários padrão para inicialização automática
+        const usuariosDefault = [
+          {
+            id: 'admin001',
+            name: 'Administrador Sistema',
+            username: 'admin',
+            password: 'admin',
+            role: 'admin',
+            email: 'controleinterno@transpjardim.tech'
+          },
+          {
+            id: 'user001',
+            name: 'João Silva',
+            username: 'educacao',
+            password: '123',
+            role: 'padrão',
+            secretaria: 'Secretaria de Educação',
+            email: 'educacao@transpjardim.tech'
+          },
+          {
+            id: 'user002',
+            name: 'Maria Santos',
+            username: 'saude',
+            password: '123',
+            role: 'padrão',
+            secretaria: 'Secretaria de Saúde',
+            email: 'saude@transpjardim.tech'
+          },
+          {
+            id: 'user003',
+            name: 'Carlos Oliveira',
+            username: 'obras',
+            password: '123',
+            role: 'padrão',
+            secretaria: 'Secretaria de Obras e Infraestrutura',
+            email: 'obras@transpjardim.tech'
+          },
+          {
+            id: 'user004',
+            name: 'Ana Costa',
+            username: 'ambiente',
+            password: '123',
+            role: 'padrão',
+            secretaria: 'Secretaria de Meio Ambiente',
+            email: 'ambiente@transpjardim.tech'
+          },
+          {
+            id: 'user005',
+            name: 'Francisco Savio',
+            username: 'franciscosavio',
+            password: '123',
+            role: 'padrão',
+            secretaria: 'Secretaria de Administração e Finanças',
+            email: 'franciscosavio@transpjardim.tech'
+          }
+        ];
+        
+        // Criar usuários se não existirem
+        for (const user of usuariosDefault) {
+          const existingUser = await kv.get(`usuario:${user.username}`);
+          if (!existingUser) {
+            const usuarioComData = {
+              ...user,
+              dataCriacao: new Date().toISOString()
+            };
+            
+            await kv.set(`usuario:${user.username}`, usuarioComData);
+            await kv.set(`usuario_id:${user.id}`, usuarioComData);
+            console.log(`✓ Auto-criado usuário: ${user.username}`);
+          }
+        }
+        
+        // Tentar buscar o usuário novamente após inicialização
+        usuario = await kv.get(`usuario:${username}`);
+        
+        if (!usuario) {
+          console.log(`Usuário ainda não encontrado após auto-inicialização: ${username}`);
+          return c.json({ 
+            success: false, 
+            error: `Usuário '${username}' não encontrado. Tente admin/admin, educacao/123 ou outro usuário padrão.` 
+          }, 401);
+        }
+        
+        console.log(`✅ Auto-inicialização concluída, usuário encontrado: ${username}`);
+      } catch (initError) {
+        console.error('Erro na auto-inicialização:', initError);
+        return c.json({ 
+          success: false, 
+          error: `Usuário '${username}' não encontrado e falha na inicialização automática.` 
+        }, 401);
+      }
     }
     
     if (usuario.password !== password) {

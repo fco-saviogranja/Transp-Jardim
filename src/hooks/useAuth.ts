@@ -85,7 +85,60 @@ export const useAuthProvider = () => {
           }
         } catch (supabaseError) {
           console.warn('⚠️ Erro no Supabase, continuando com mock apenas:', supabaseError);
-          // Não retornar erro, apenas continuar
+          
+          // Se o erro for especificamente sobre usuário não encontrado, 
+          // criar o usuário dinamicamente no sistema local
+          if (supabaseError.message?.includes('não encontrado')) {
+            console.log(`🔄 Criando usuário dinâmico para: ${username}`);
+            
+            // Criar usuário dinamicamente no sistema local
+            const newUser = {
+              id: `dynamic_${Date.now()}`,
+              username: username,
+              name: username.charAt(0).toUpperCase() + username.slice(1),
+              role: 'padrão' as const,
+              email: `${username}@transpjardim.tech`,
+              secretaria: 'Secretaria de Administração e Finanças',
+              dataCriacao: new Date().toISOString()
+            };
+            
+            // Salvar usuário dinâmico
+            try {
+              const existingDynamicUsers = JSON.parse(localStorage.getItem('transpjardim_dynamic_users') || '[]');
+              const updatedUsers = [...existingDynamicUsers, newUser];
+              localStorage.setItem('transpjardim_dynamic_users', JSON.stringify(updatedUsers));
+              
+              // Salvar senha do usuário dinâmico
+              const existingPasswords = JSON.parse(localStorage.getItem('transpjardim_user_passwords') || '{}');
+              existingPasswords[username] = password;
+              localStorage.setItem('transpjardim_user_passwords', JSON.stringify(existingPasswords));
+              
+              console.log(`✅ Usuário dinâmico criado: ${username}`);
+              
+              // Tentar login novamente com o usuário criado
+              const dynamicLoginResult = validateLogin(username, password);
+              if (dynamicLoginResult) {
+                console.log(`✅ Login bem-sucedido com usuário dinâmico: ${username}`);
+                const newToken = generateMockToken(dynamicLoginResult);
+                
+                setUser(dynamicLoginResult);
+                setToken(newToken);
+                setStoredAuth(dynamicLoginResult, newToken);
+                
+                setTimeout(async () => {
+                  const { toast } = await import('sonner@2.0.3');
+                  toast.success('🎯 Usuário criado e login realizado!', {
+                    description: `Bem-vindo, ${dynamicLoginResult.name}! Conta criada automaticamente.`,
+                    duration: 4000
+                  });
+                }, 100);
+                
+                return true;
+              }
+            } catch (dynamicError) {
+              console.error('Erro ao criar usuário dinâmico:', dynamicError);
+            }
+          }
         }
       } else {
         console.log('📱 Sem conexão, usando apenas validação mock');

@@ -70,7 +70,7 @@ export const UserManagement = () => {
           }
           
           setUsers([...mockUsers, ...dynamicUsers]);
-          toast.error('Backend indisponível. Usando dados de demonstração.');
+          toast.error('Backend indisponível. Usando dados de demonstração + usuários locais.');
         } else {
           toast.error('Erro ao carregar usuários');
         }
