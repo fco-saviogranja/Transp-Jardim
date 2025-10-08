@@ -29,15 +29,27 @@ export const useAuthProvider = () => {
   const supabase = useSupabase();
 
   useEffect(() => {
-    try {
-      const { user: storedUser, token: storedToken } = getStoredAuth();
-      setUser(storedUser);
-      setToken(storedToken);
-    } catch (error) {
-      console.warn('Erro ao carregar autenticação:', error);
-    } finally {
-      setLoading(false);
-    }
+    // Carregamento assíncrono para evitar bloquear a thread principal
+    const loadAuth = async () => {
+      try {
+        // Usar setTimeout para não bloquear o carregamento inicial
+        setTimeout(() => {
+          try {
+            const { user: storedUser, token: storedToken } = getStoredAuth();
+            setUser(storedUser);
+            setToken(storedToken);
+          } catch (error) {
+            console.warn('Erro ao carregar autenticação:', error);
+          } finally {
+            setLoading(false);
+          }
+        }, 0);
+      } catch (error) {
+        setLoading(false);
+      }
+    };
+    
+    loadAuth();
   }, []);
 
   const login = async (username: string, password: string): Promise<boolean> => {
@@ -55,14 +67,18 @@ export const useAuthProvider = () => {
         setToken(newToken);
         setStoredAuth(validatedUser, newToken);
         
-        // Notificar usuário de que está usando sistema local
-        setTimeout(async () => {
-          const { toast } = await import('sonner@2.0.3');
-          toast.success('🎯 Login realizado com sucesso!', {
-            description: `Bem-vindo, ${validatedUser.name}! Sistema funcionando em modo local.`,
-            duration: 4000
-          });
-        }, 100);
+        // Notificar usuário de forma assíncrona para não bloquear login
+        requestAnimationFrame(async () => {
+          try {
+            const { toast } = await import('sonner@2.0.3');
+            toast.success('🎯 Login realizado com sucesso!', {
+              description: `Bem-vindo, ${validatedUser.name}!`,
+              duration: 3000
+            });
+          } catch {
+            // Ignorar erro de toast
+          }
+        });
         
         return true;
       }
@@ -86,58 +102,36 @@ export const useAuthProvider = () => {
         } catch (supabaseError) {
           console.warn('⚠️ Erro no Supabase, continuando com mock apenas:', supabaseError);
           
-          // Se o erro for especificamente sobre usuário não encontrado, 
-          // criar o usuário dinamicamente no sistema local
+          // Criação de usuário dinâmico simplificada para evitar timeouts
           if (supabaseError.message?.includes('não encontrado')) {
-            console.log(`🔄 Criando usuário dinâmico para: ${username}`);
+            console.log(`🔄 Tentando criar usuário dinâmico: ${username}`);
             
-            // Criar usuário dinamicamente no sistema local
-            const newUser = {
-              id: `dynamic_${Date.now()}`,
-              username: username,
-              name: username.charAt(0).toUpperCase() + username.slice(1),
-              role: 'padrão' as const,
-              email: `${username}@transpjardim.tech`,
-              secretaria: 'Secretaria de Administração e Finanças',
-              dataCriacao: new Date().toISOString()
-            };
-            
-            // Salvar usuário dinâmico
-            try {
-              const existingDynamicUsers = JSON.parse(localStorage.getItem('transpjardim_dynamic_users') || '[]');
-              const updatedUsers = [...existingDynamicUsers, newUser];
-              localStorage.setItem('transpjardim_dynamic_users', JSON.stringify(updatedUsers));
-              
-              // Salvar senha do usuário dinâmico
-              const existingPasswords = JSON.parse(localStorage.getItem('transpjardim_user_passwords') || '{}');
-              existingPasswords[username] = password;
-              localStorage.setItem('transpjardim_user_passwords', JSON.stringify(existingPasswords));
-              
-              console.log(`✅ Usuário dinâmico criado: ${username}`);
-              
-              // Tentar login novamente com o usuário criado
-              const dynamicLoginResult = validateLogin(username, password);
-              if (dynamicLoginResult) {
-                console.log(`✅ Login bem-sucedido com usuário dinâmico: ${username}`);
-                const newToken = generateMockToken(dynamicLoginResult);
+            // Processo assíncrono para não bloquear
+            setTimeout(() => {
+              try {
+                const newUser = {
+                  id: `dynamic_${Date.now()}`,
+                  username: username,
+                  name: username.charAt(0).toUpperCase() + username.slice(1),
+                  role: 'padrão' as const,
+                  email: `${username}@transpjardim.tech`,
+                  secretaria: 'Secretaria de Administração e Finanças',
+                  dataCriacao: new Date().toISOString()
+                };
                 
-                setUser(dynamicLoginResult);
-                setToken(newToken);
-                setStoredAuth(dynamicLoginResult, newToken);
+                // Operações localStorage otimizadas
+                const existingUsers = JSON.parse(localStorage.getItem('transpjardim_dynamic_users') || '[]');
+                localStorage.setItem('transpjardim_dynamic_users', JSON.stringify([...existingUsers, newUser]));
                 
-                setTimeout(async () => {
-                  const { toast } = await import('sonner@2.0.3');
-                  toast.success('🎯 Usuário criado e login realizado!', {
-                    description: `Bem-vindo, ${dynamicLoginResult.name}! Conta criada automaticamente.`,
-                    duration: 4000
-                  });
-                }, 100);
+                const existingPasswords = JSON.parse(localStorage.getItem('transpjardim_user_passwords') || '{}');
+                existingPasswords[username] = password;
+                localStorage.setItem('transpjardim_user_passwords', JSON.stringify(existingPasswords));
                 
-                return true;
+                console.log(`✅ Usuário dinâmico criado em background: ${username}`);
+              } catch (error) {
+                console.warn('Erro ao criar usuário dinâmico em background:', error);
               }
-            } catch (dynamicError) {
-              console.error('Erro ao criar usuário dinâmico:', dynamicError);
-            }
+            }, 0);
           }
         }
       } else {

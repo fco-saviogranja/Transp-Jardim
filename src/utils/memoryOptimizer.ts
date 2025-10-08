@@ -8,43 +8,44 @@ let memoryWarningCount = 0;
 export function optimizeMemoryUsage(): void {
   const now = Date.now();
   
-  // Apenas verificar a cada 5 minutos para reduzir overhead
-  if (now - lastMemoryCheck < 300000) {
+  // Apenas verificar a cada 10 minutos para reduzir overhead drasticamente
+  if (now - lastMemoryCheck < 600000) {
     return;
   }
   
   lastMemoryCheck = now;
   
   try {
-    // Verificar memória se API estiver disponível
-    if ('memory' in performance) {
+    // Verificação leve e rápida apenas se necessário
+    if ('memory' in performance && typeof (performance as any).memory === 'object') {
       const memInfo = (performance as any).memory;
-      const used = Math.round(memInfo.usedJSHeapSize / 1048576); // MB
-      const limit = Math.round(memInfo.jsHeapSizeLimit / 1048576); // MB
+      const used = memInfo.usedJSHeapSize;
+      const limit = memInfo.jsHeapSizeLimit;
       
-      // Apenas alertar se uso for muito alto (mais de 70% do limite)
+      // Apenas alertar se uso for crítico (mais de 80% do limite)
       const percentage = (used / limit) * 100;
-      if (percentage > 70) {
+      if (percentage > 80) {
         memoryWarningCount++;
         
-        // Alertar apenas ocasionalmente para evitar spam
-        if (memoryWarningCount % 3 === 1) {
-          console.warn('⚠️ Alto uso de memória:', {
-            used: `${used}MB`,
-            limit: `${limit}MB`,
-            percentage: `${Math.round(percentage)}%`
-          });
+        // Alertar muito raramente para evitar spam
+        if (memoryWarningCount % 5 === 1) {
+          console.warn('⚠️ Memória crítica:', Math.round(percentage) + '%');
         }
         
-        // Tentar otimizações automáticas
-        performMemoryOptimizations();
+        // Otimizações leves
+        requestIdleCallback(() => {
+          try {
+            if (typeof window !== 'undefined' && window.gc) {
+              window.gc();
+            }
+          } catch {}
+        });
       } else {
-        // Reset contador se memória voltar ao normal
         memoryWarningCount = 0;
       }
     }
   } catch (error) {
-    // Ignorar erros silenciosamente
+    // Ignorar todos os erros silenciosamente
   }
 }
 

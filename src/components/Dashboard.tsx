@@ -3,6 +3,7 @@ import { CriteriosChart } from './CriteriosChart';
 import { AlertsPanel } from './AlertsPanel';
 import { JardimBreadcrumb } from './JardimBreadcrumb';
 import { CriterioCompletionStatus } from './CriterioCompletionStatus';
+import { useMemo } from 'react';
 import { Criterio, Alerta, Metricas, User } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
@@ -20,11 +21,21 @@ interface DashboardProps {
 }
 
 export const Dashboard = ({ criterios, alertas, metricas, user, onMarkAlertAsRead, onToggleCompletion }: DashboardProps) => {
-  // Critérios prioritários (próximos ao vencimento)
-  const criteriosPrioritarios = criterios
-    .filter(c => c.status === 'ativo' || c.status === 'pendente')
-    .sort((a, b) => new Date(a.dataVencimento).getTime() - new Date(b.dataVencimento).getTime())
-    .slice(0, 5);
+  // Critérios prioritários otimizados (com verificação de segurança)
+  const criteriosPrioritarios = useMemo(() => {
+    if (!criterios || criterios.length === 0) return [];
+    
+    return criterios
+      .filter(c => c.status === 'ativo' || c.status === 'pendente')
+      .sort((a, b) => {
+        const dateA = new Date(a.dataVencimento);
+        const dateB = new Date(b.dataVencimento);
+        // Verificar se as datas são válidas
+        if (isNaN(dateA.getTime()) || isNaN(dateB.getTime())) return 0;
+        return dateA.getTime() - dateB.getTime();
+      })
+      .slice(0, 5);
+  }, [criterios]);
 
   const getStatusBadge = (status: string) => {
     const variants = {
