@@ -4,11 +4,8 @@
   import path from 'path';
 
   export default defineConfig({
-     build: {
-        chunkSizeWarningLimit: 800, // Set the limit to 800 KB
-      },
-	plugins: [react()],
-   	 resolve: {
+    plugins: [react()],
+    resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
       alias: {
         'vaul@1.1.2': 'vaul',
@@ -59,6 +56,7 @@
     build: {
       target: 'esnext',
       outDir: 'build',
+      chunkSizeWarningLimit: 800, // Set the limit to 800 KB
     },
     server: {
       port: 3000,
