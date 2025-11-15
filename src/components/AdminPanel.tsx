@@ -16,6 +16,7 @@ import { AlertsDebugPanel } from './AlertsDebugPanel';
 import { EmailTestButton } from './EmailTestButton';
 import { EmailStatusIndicator } from './EmailStatusIndicator';
 import { SimpleEmailTest } from './SimpleEmailTest';
+import { EmailConfigSimple } from './EmailConfigSimple';
 import { useSupabase } from '../hooks/useSupabase';
 import { JardimLogo } from './JardimLogo';
 import { mockCriterios, mockAlertas } from '../lib/mockData';
@@ -257,7 +258,7 @@ export const AdminPanel = ({ onNavigate }: AdminPanelProps) => {
           onHomeClick={() => onNavigate ? onNavigate('dashboard') : setCurrentView('dashboard')}
         />
         <div className="bg-white rounded-lg p-6 shadow-sm border border-[var(--border)]">
-          <EmailConfigPanel onClose={() => setCurrentView('dashboard')} />
+          <EmailConfigSimple />
         </div>
       </div>
     );

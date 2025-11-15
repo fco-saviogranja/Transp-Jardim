@@ -57,6 +57,7 @@ export function QuickSetupGuide({ onComplete }: QuickSetupGuideProps) {
   const handleStepAction = (step: any) => {
     if (step.internal) {
       // Ação interna - ir para configuração
+      markStepCompleted(step.id);
       if (onComplete) {
         onComplete();
       }

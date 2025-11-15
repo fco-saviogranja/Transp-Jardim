@@ -132,14 +132,22 @@ export async function mdel(keys: string[]): Promise<void> {
 }
 
 // Função para buscar chaves por prefixo
-export async function getByPrefix(prefix: string): Promise<Array<{key: string, value: any}>> {
+export async function getByPrefix(prefix: string, limit?: number): Promise<Array<{key: string, value: any}>> {
   try {
-    console.log(`Buscando chaves com prefixo: ${prefix}`);
+    console.log(`Buscando chaves com prefixo: ${prefix}${limit ? ` (limite: ${limit})` : ''}`);
     
-    const { data, error } = await supabase
+    let query = supabase
       .from(KV_TABLE)
       .select('key, value')
-      .like('key', `${prefix}%`);
+      .like('key', `${prefix}%`)
+      .order('key', { ascending: true });
+    
+    // Aplicar limite se fornecido
+    if (limit) {
+      query = query.limit(limit);
+    }
+    
+    const { data, error } = await query;
     
     if (error) {
       console.error('Erro na query getByPrefix:', error);

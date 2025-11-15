@@ -30,6 +30,45 @@ console.log('Supabase Key:', supabaseKey ? 'Configurada' : 'Não configurada');
 
 const supabase = createClient(supabaseUrl || '', supabaseKey || '');
 
+// Helper function para obter API Key do Resend
+async function getResendApiKey(): Promise<string | null> {
+  try {
+    // Primeiro tenta pegar do KV Store
+    const config = await kv.get('config:resend_api_key');
+    if (config && config.apiKey) {
+      return config.apiKey;
+    }
+    
+    // Se não encontrar no KV, tenta do ambiente
+    const envKey = Deno.env.get('RESEND_API_KEY');
+    if (envKey) {
+      return envKey;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Erro ao obter API Key do Resend:', error);
+    return Deno.env.get('RESEND_API_KEY') || null;
+  }
+}
+
+// Helper function para obter info do modo de teste
+async function getTestModeInfo(): Promise<{ testMode: boolean; authorizedEmail?: string }> {
+  try {
+    const config = await kv.get('config:resend_api_key');
+    if (config && config.testMode) {
+      return {
+        testMode: true,
+        authorizedEmail: config.authorizedEmail
+      };
+    }
+    return { testMode: false };
+  } catch (error) {
+    console.error('Erro ao obter info do modo de teste:', error);
+    return { testMode: false };
+  }
+}
+
 // ============================================
 // ROTAS DO TRANSPJARDIM
 // ============================================
@@ -446,14 +485,14 @@ app.post('/make-server-225e1157/email/send-alert', async (c) => {
     const { to, subject, alertType, criterio, usuario, dueDate } = await c.req.json();
     console.log(`Enviando alerta por e-mail para: ${to}`);
     
-    const resendApiKey = Deno.env.get('RESEND_API_KEY');
+    const resendApiKey = await getResendApiKey();
     if (!resendApiKey) {
       console.error('RESEND_API_KEY não configurada');
       return c.json({ 
         success: false, 
         error: 'RESEND_API_KEY não configurada no servidor',
         errorType: 'missing_api_key',
-        details: 'Configure a variável de ambiente RESEND_API_KEY'
+        details: 'Configure a API Key na interface de configuração'
       }, 500);
     }
 
@@ -728,7 +767,7 @@ app.get('/make-server-225e1157/email/check-config', async (c) => {
   try {
     console.log('Verificando configuração de e-mail...');
     
-    const resendApiKey = Deno.env.get('RESEND_API_KEY');
+    const resendApiKey = await getResendApiKey();
     
     if (!resendApiKey) {
       return c.json({ 
@@ -797,7 +836,7 @@ app.get('/make-server-225e1157/email/logs', async (c) => {
 // Verificar status do domínio
 app.get('/make-server-225e1157/email/domain-status', async (c) => {
   try {
-    const resendApiKey = Deno.env.get('RESEND_API_KEY');
+    const resendApiKey = await getResendApiKey();
     if (!resendApiKey) {
       return c.json({
         success: false,
@@ -850,6 +889,123 @@ app.get('/make-server-225e1157/email/domain-status', async (c) => {
   }
 });
 
+// Salvar API Key do Resend
+app.post('/make-server-225e1157/email/save-api-key', async (c) => {
+  try {
+    const { apiKey } = await c.req.json();
+    
+    if (!apiKey) {
+      return c.json({ 
+        success: false, 
+        error: 'API Key é obrigatória' 
+      }, 400);
+    }
+    
+    // Validar formato da API key
+    const apiKeyTrimmed = apiKey.trim();
+    if (!apiKeyTrimmed.startsWith('re_') || apiKeyTrimmed.length < 32) {
+      return c.json({ 
+        success: false, 
+        error: 'API Key com formato inválido. Deve começar com "re_" e ter pelo menos 32 caracteres.',
+        errorType: 'invalid_api_key_format'
+      }, 400);
+    }
+    
+    console.log('💾 Salvando RESEND_API_KEY no ambiente...');
+    
+    // Testar a API Key primeiro
+    const testResponse = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKeyTrimmed}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: 'onboarding@resend.dev',
+        to: ['test@test.local'],
+        subject: 'Test',
+        html: '<p>Test</p>',
+      }),
+    });
+    
+    const testResult = await testResponse.json();
+    
+    // Se for 401, a API Key é inválida
+    if (testResponse.status === 401) {
+      return c.json({ 
+        success: false, 
+        error: 'API Key inválida ou expirada',
+        errorType: 'invalid_api_key'
+      }, 401);
+    }
+    
+    // Se for 403 com mensagem de modo de teste, a API Key é válida
+    let isTestMode = false;
+    let authorizedEmail = '';
+    
+    if (testResponse.status === 403) {
+      if (testResult.message && testResult.message.includes('You can only send testing emails to your own email address')) {
+        console.log('🔵 API Key válida - Modo de teste detectado');
+        isTestMode = true;
+        
+        // Extrair e-mail autorizado
+        const emailMatch = testResult.message.match(/\(([^)]+)\)/);
+        authorizedEmail = emailMatch ? emailMatch[1] : '';
+        
+        console.log(`📧 E-mail autorizado: ${authorizedEmail}`);
+      } else if (testResult.message && testResult.message.includes('domain is not verified')) {
+        console.log('🔵 API Key válida - Domínio não verificado');
+        isTestMode = false;
+      } else {
+        return c.json({ 
+          success: false, 
+          error: 'Erro ao validar API Key: ' + testResult.message,
+          errorType: 'validation_failed'
+        }, 403);
+      }
+    }
+    
+    // Salvar no KV Store
+    try {
+      await kv.set('config:resend_api_key', {
+        apiKey: apiKeyTrimmed,
+        savedAt: new Date().toISOString(),
+        testMode: isTestMode,
+        authorizedEmail: authorizedEmail || undefined
+      });
+      
+      console.log('✅ RESEND_API_KEY salva com sucesso no KV Store');
+      
+      return c.json({ 
+        success: true, 
+        message: 'API Key salva com sucesso',
+        testMode: isTestMode,
+        authorizedEmail: isTestMode ? authorizedEmail : undefined,
+        note: isTestMode 
+          ? `Sistema em modo de teste. E-mails serão enviados para: ${authorizedEmail}`
+          : 'API Key configurada com sucesso'
+      });
+      
+    } catch (kvError) {
+      console.error('❌ Erro ao salvar API Key no KV Store:', kvError);
+      return c.json({ 
+        success: false, 
+        error: 'Erro ao salvar API Key no sistema de armazenamento',
+        errorType: 'storage_error',
+        details: kvError instanceof Error ? kvError.message : 'Erro desconhecido'
+      }, 500);
+    }
+    
+  } catch (error) {
+    console.error('❌ Erro ao salvar API Key:', error);
+    return c.json({ 
+      success: false, 
+      error: 'Erro interno do servidor',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    }, 500);
+  }
+});
+
 // Testar configuração de e-mail
 app.post('/make-server-225e1157/email/test', async (c) => {
   try {
@@ -863,12 +1019,14 @@ app.post('/make-server-225e1157/email/test', async (c) => {
     }
     
     // Permitir API key temporária para testes de configuração
-    let resendApiKey = Deno.env.get('RESEND_API_KEY');
     const tempApiKey = c.req.header('X-Test-API-Key');
+    let resendApiKey: string | null = null;
     
     if (configTest && tempApiKey) {
       console.log('🔧 Usando API Key temporária para teste de configuração');
       resendApiKey = tempApiKey;
+    } else {
+      resendApiKey = await getResendApiKey();
     }
     
     if (!resendApiKey) {
@@ -1083,6 +1241,11 @@ app.get('/make-server-225e1157/users', async (c) => {
   try {
     console.log('=== INICIANDO LISTAGEM DE USUÁRIOS ===');
     
+    // Timeout de segurança (2 segundos)
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Timeout ao buscar usuários')), 2000)
+    );
+    
     // Verificar se a função kv.getByPrefix existe
     if (typeof kv.getByPrefix !== 'function') {
       console.error('ERRO CRÍTICO: kv.getByPrefix não é uma função');
@@ -1094,9 +1257,15 @@ app.get('/make-server-225e1157/users', async (c) => {
       }, 500);
     }
     
-    console.log('Chamando kv.getByPrefix("usuario:")...');
-    const usuarios = await kv.getByPrefix('usuario:');
-    console.log(`Resultado bruto da busca:`, usuarios);
+    console.log('Chamando kv.getByPrefix("usuario_id:") com limite de 100...');
+    
+    // Usar Promise.race para aplicar timeout
+    const usuarios = await Promise.race([
+      kv.getByPrefix('usuario_id:', 100),
+      timeoutPromise
+    ]) as Array<{key: string, value: any}>;
+    
+    console.log(`Resultado da busca: ${usuarios?.length || 0} usuários`);
     
     if (!Array.isArray(usuarios)) {
       console.error('ERRO: getByPrefix não retornou um array:', typeof usuarios);
@@ -1117,7 +1286,6 @@ app.get('/make-server-225e1157/users', async (c) => {
     }).filter(Boolean); // Remove nulls
     
     console.log(`✅ ${usuariosSemSenha.length} usuários processados com sucesso`);
-    console.log('Usuários encontrados:', usuariosSemSenha.map(u => u.username));
     
     return c.json({ 
       success: true, 
@@ -1126,8 +1294,18 @@ app.get('/make-server-225e1157/users', async (c) => {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('💥 ERRO CRÍTICO ao buscar usuários:', error);
+    console.error('💥 ERRO ao buscar usuários:', error);
     console.error('Stack trace:', error instanceof Error ? error.stack : 'No stack trace');
+    
+    // Se for timeout, retornar erro mais específico
+    if (error instanceof Error && error.message.includes('Timeout')) {
+      return c.json({ 
+        success: false, 
+        error: 'Timeout ao buscar usuários - banco de dados lento',
+        details: 'A operação demorou mais de 2 segundos',
+        timestamp: new Date().toISOString()
+      }, 504);
+    }
     
     return c.json({ 
       success: false, 
@@ -1141,7 +1319,7 @@ app.get('/make-server-225e1157/users', async (c) => {
 // Criar usuário
 app.post('/make-server-225e1157/users', async (c) => {
   try {
-    const { name, username, password, role, secretaria } = await c.req.json();
+    const { name, username, email, password, role, secretaria } = await c.req.json();
     console.log(`Criando usuário: ${username}`);
     
     // Validações básicas
@@ -1150,6 +1328,17 @@ app.post('/make-server-225e1157/users', async (c) => {
         success: false, 
         error: 'Nome, usuário, senha e role são obrigatórios' 
       }, 400);
+    }
+    
+    // Validar e-mail se fornecido
+    if (email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return c.json({ 
+          success: false, 
+          error: 'E-mail inválido' 
+        }, 400);
+      }
     }
     
     // Verificar se username já existe
@@ -1166,6 +1355,7 @@ app.post('/make-server-225e1157/users', async (c) => {
       id,
       name,
       username,
+      email: email || '',
       password,
       role,
       secretaria: role === 'admin' ? undefined : secretaria,
@@ -1175,7 +1365,7 @@ app.post('/make-server-225e1157/users', async (c) => {
     await kv.set(`usuario:${username}`, novoUsuario);
     await kv.set(`usuario_id:${id}`, novoUsuario);
     
-    console.log(`Usuário criado: ${username}`);
+    console.log(`✅ Usuário criado: ${username} - Email: ${email || 'N/A'}`);
     
     const { password: _, ...usuarioSemSenha } = novoUsuario;
     
@@ -1197,7 +1387,7 @@ app.post('/make-server-225e1157/users', async (c) => {
 app.put('/make-server-225e1157/users/:id', async (c) => {
   try {
     const id = c.req.param('id');
-    const { name, username, password, role, secretaria } = await c.req.json();
+    const { name, username, email, password, role, secretaria } = await c.req.json();
     console.log(`Atualizando usuário ID: ${id}`);
     
     const usuarioAtual = await kv.get(`usuario_id:${id}`);
@@ -1212,6 +1402,7 @@ app.put('/make-server-225e1157/users/:id', async (c) => {
       ...usuarioAtual,
       ...(name && { name }),
       ...(username && { username }),
+      ...(email && { email }),
       ...(password && { password }),
       ...(role && { role }),
       secretaria: role === 'admin' ? undefined : secretaria,
@@ -1228,7 +1419,7 @@ app.put('/make-server-225e1157/users/:id', async (c) => {
     
     await kv.set(`usuario_id:${id}`, usuarioAtualizado);
     
-    console.log(`Usuário atualizado: ${usuarioAtualizado.username}`);
+    console.log(`✅ Usuário atualizado: ${usuarioAtualizado.username} - Email: ${usuarioAtualizado.email || 'N/A'}`);
     
     const { password: _, ...usuarioSemSenha } = usuarioAtualizado;
     
@@ -1276,17 +1467,6 @@ app.delete('/make-server-225e1157/users/:id', async (c) => {
       error: 'Erro interno do servidor' 
     }, 500);
   }
-});
-
-// Rota catch-all
-app.all('*', (c) => {
-  console.log(`Rota não encontrada: ${c.req.method} ${c.req.path}`);
-  return c.json({ 
-    success: false, 
-    error: 'Rota não encontrada',
-    path: c.req.path,
-    method: c.req.method 
-  }, 404);
 });
 
 // ============================================
@@ -1362,6 +1542,88 @@ app.get('/make-server-225e1157/users/emails', async (c) => {
   }
 });
 
+// Buscar usuários por secretaria (para seleção de responsáveis em critérios)
+app.get('/make-server-225e1157/users/by-secretaria/:secretaria', async (c) => {
+  try {
+    const secretaria = decodeURIComponent(c.req.param('secretaria') || '');
+    console.log(`=== BUSCANDO USUÁRIOS DA SECRETARIA: "${secretaria}" ===`);
+    
+    if (!secretaria) {
+      console.error('❌ Secretaria não especificada');
+      return c.json({ 
+        success: false, 
+        error: 'Secretaria não especificada' 
+      }, 400);
+    }
+    
+    // Timeout de segurança (5 segundos para operações de leitura)
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Timeout ao buscar usuários')), 5000)
+    );
+    
+    if (typeof kv.getByPrefix !== 'function') {
+      console.error('ERRO CRÍTICO: kv.getByPrefix não é uma função');
+      return c.json({ 
+        success: false, 
+        error: 'Erro de configuração do sistema de armazenamento'
+      }, 500);
+    }
+    
+    console.log('Buscando todos os usuários com prefixo "usuario_id:"...');
+    
+    // Buscar todos os usuários
+    const usuarios = await Promise.race([
+      kv.getByPrefix('usuario_id:', 100),
+      timeoutPromise
+    ]) as Array<{key: string, value: any}>;
+    
+    console.log(`✓ Encontrados ${usuarios?.length || 0} usuários no total`);
+    
+    if (!Array.isArray(usuarios)) {
+      console.error('ERRO: getByPrefix não retornou um array');
+      return c.json({ 
+        success: false, 
+        error: 'Formato de dados inesperado do armazenamento' 
+      }, 500);
+    }
+    
+    // Filtrar usuários pela secretaria
+    const usuariosDaSecretaria = usuarios
+      .map(item => item.value)
+      .filter(user => user && user.secretaria === secretaria)
+      .map(({ password, ...usuarioSemSenha }) => usuarioSemSenha);
+    
+    console.log(`✅ ${usuariosDaSecretaria.length} usuários encontrados na secretaria ${secretaria}`);
+    
+    return c.json({ 
+      success: true, 
+      data: usuariosDaSecretaria,
+      count: usuariosDaSecretaria.length,
+      secretaria: secretaria,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('💥 ERRO ao buscar usuários por secretaria:', error);
+    console.error('Stack trace:', error instanceof Error ? error.stack : 'No stack trace');
+    
+    if (error instanceof Error && error.message.includes('Timeout')) {
+      return c.json({ 
+        success: false, 
+        error: 'Timeout ao buscar usuários - banco de dados lento',
+        details: 'A operação demorou mais de 2 segundos',
+        timestamp: new Date().toISOString()
+      }, 504);
+    }
+    
+    return c.json({ 
+      success: false, 
+      error: 'Erro interno do servidor ao buscar usuários',
+      details: error instanceof Error ? error.message : 'Erro desconhecido',
+      timestamp: new Date().toISOString()
+    }, 500);
+  }
+});
+
 // Enviar notificação para múltiplos usuários baseado em critério
 app.post('/make-server-225e1157/email/notify-users', async (c) => {
   try {
@@ -1411,7 +1673,7 @@ app.post('/make-server-225e1157/email/notify-users', async (c) => {
       ? `🔴 URGENTE: ${criterio?.nome}` 
       : `🟡 AVISO: ${criterio?.nome}`;
     
-    const resendApiKey = Deno.env.get('RESEND_API_KEY');
+    const resendApiKey = await getResendApiKey();
     if (!resendApiKey) {
       return c.json({ 
         success: false, 
@@ -1533,6 +1795,36 @@ app.post('/make-server-225e1157/email/notify-users', async (c) => {
       details: error instanceof Error ? error.message : 'Erro desconhecido'
     }, 500);
   }
+});
+
+// ============================================
+// ROTA CATCH-ALL (DEVE SER A ÚLTIMA ROTA)
+// ============================================
+app.all('*', (c) => {
+  console.log(`❌ Rota não encontrada: ${c.req.method} ${c.req.path}`);
+  return c.json({ 
+    success: false, 
+    error: 'Rota não encontrada',
+    path: c.req.path,
+    method: c.req.method,
+    availableRoutes: [
+      'POST /make-server-225e1157/login',
+      'POST /make-server-225e1157/signup',
+      'GET /make-server-225e1157/users',
+      'GET /make-server-225e1157/users/emails',
+      'GET /make-server-225e1157/users/by-secretaria/:secretaria',
+      'POST /make-server-225e1157/users',
+      'PUT /make-server-225e1157/users/:id',
+      'DELETE /make-server-225e1157/users/:id',
+      'GET /make-server-225e1157/criterios',
+      'POST /make-server-225e1157/criterios',
+      'PUT /make-server-225e1157/criterios/:id',
+      'DELETE /make-server-225e1157/criterios/:id',
+      'POST /make-server-225e1157/email/send',
+      'POST /make-server-225e1157/email/save-api-key',
+      'POST /make-server-225e1157/email/notify-users'
+    ]
+  }, 404);
 });
 
 console.log('Servidor TranspJardim inicializado e pronto para receber requisições');

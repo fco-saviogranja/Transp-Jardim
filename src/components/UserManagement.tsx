@@ -194,6 +194,40 @@ export const UserManagement = () => {
                 }
               : user
           ));
+          
+          // Persistir alterações no localStorage
+          try {
+            const existingDynamicUsers = localStorage.getItem('transpjardim_dynamic_users');
+            let dynamicUsers = existingDynamicUsers ? JSON.parse(existingDynamicUsers) : [];
+            
+            // Atualizar usuário dinâmico se existir
+            dynamicUsers = dynamicUsers.map((u: User) => 
+              u.id === editingUser.id 
+                ? {
+                    ...u,
+                    name: formData.name,
+                    username: formData.username,
+                    email: formData.email,
+                    role: formData.role,
+                    secretaria: formData.role === 'admin' ? undefined : formData.secretaria
+                  }
+                : u
+            );
+            
+            localStorage.setItem('transpjardim_dynamic_users', JSON.stringify(dynamicUsers));
+            
+            // Atualizar senha se foi alterada
+            if (formData.password) {
+              const userPasswords = JSON.parse(localStorage.getItem('transpjardim_user_passwords') || '{}');
+              userPasswords[formData.username] = formData.password;
+              localStorage.setItem('transpjardim_user_passwords', JSON.stringify(userPasswords));
+            }
+            
+            console.log(`✅ Usuário ${formData.username} atualizado no localStorage - Email: ${formData.email}`);
+          } catch (error) {
+            console.error('Erro ao persistir atualização do usuário:', error);
+          }
+          
           toast.success('Usuário atualizado (modo demonstração)');
         } else {
           const newUser: User = {

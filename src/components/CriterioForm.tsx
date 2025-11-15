@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -8,6 +8,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Criterio } from '../types';
 import { secretarias } from '../lib/mockData';
 import { toast } from '../utils/toast';
+import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { User } from '../types';
 
 interface CriterioFormProps {
   isOpen: boolean;
@@ -30,6 +32,8 @@ export const CriterioForm = ({ isOpen, onClose, onSubmit, editCriterio }: Criter
   });
 
   const [loading, setLoading] = useState(false);
+  const [responsaveisDisponiveis, setResponsaveisDisponiveis] = useState<User[]>([]);
+  const [loadingResponsaveis, setLoadingResponsaveis] = useState(false);
 
   // Resetar form quando o dialog abrir/fechar ou quando editCriterio mudar
   useEffect(() => {
@@ -46,6 +50,10 @@ export const CriterioForm = ({ isOpen, onClose, onSubmit, editCriterio }: Criter
           descricao: editCriterio.descricao,
           periodicidade: editCriterio.periodicidade
         });
+        // Buscar responsáveis da secretaria do critério sendo editado
+        if (editCriterio.secretaria) {
+          buscarResponsaveisPorSecretaria(editCriterio.secretaria);
+        }
       } else {
         setFormData({
           nome: '',
@@ -58,9 +66,71 @@ export const CriterioForm = ({ isOpen, onClose, onSubmit, editCriterio }: Criter
           descricao: '',
           periodicidade: 'mensal'
         });
+        setResponsaveisDisponiveis([]);
       }
     }
   }, [isOpen, editCriterio]);
+
+  // Buscar responsáveis quando a secretaria mudar
+  const buscarResponsaveisPorSecretaria = async (secretaria: string) => {
+    if (!secretaria) {
+      setResponsaveisDisponiveis([]);
+      return;
+    }
+
+    setLoadingResponsaveis(true);
+    try {
+      console.log('Buscando responsáveis para secretaria:', secretaria);
+      const url = `https://${projectId}.supabase.co/functions/v1/make-server-225e1157/users/by-secretaria/${encodeURIComponent(secretaria)}`;
+      console.log('URL da requisição:', url);
+      
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${publicAnonKey}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('Status da resposta:', response.status);
+      
+      const result = await response.json();
+      console.log('Resultado completo:', result);
+
+      if (!response.ok) {
+        throw new Error(result.error || `Erro HTTP ${response.status}`);
+      }
+      
+      if (result.success && Array.isArray(result.data)) {
+        setResponsaveisDisponiveis(result.data);
+        console.log(`${result.data.length} responsáveis encontrados para ${secretaria}`);
+      } else {
+        setResponsaveisDisponiveis([]);
+        console.warn('Resposta sem dados:', result);
+      }
+    } catch (error) {
+      console.error('Erro detalhado ao buscar responsáveis:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      toast.error(`Erro ao buscar responsáveis: ${errorMessage}`);
+      setResponsaveisDisponiveis([]);
+    } finally {
+      setLoadingResponsaveis(false);
+    }
+  };
+
+  // Atualizar responsáveis quando secretaria mudar
+  useEffect(() => {
+    if (formData.secretaria) {
+      buscarResponsaveisPorSecretaria(formData.secretaria);
+      // Limpar responsável selecionado ao mudar secretaria (exceto quando estiver editando)
+      if (!editCriterio || formData.secretaria !== editCriterio.secretaria) {
+        setFormData(prev => ({ ...prev, responsavel: '' }));
+      }
+    } else {
+      setResponsaveisDisponiveis([]);
+      setFormData(prev => ({ ...prev, responsavel: '' }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.secretaria]);
 
   const statusOptions = [
     { value: 'ativo', label: 'Ativo' },
@@ -208,13 +278,35 @@ export const CriterioForm = ({ isOpen, onClose, onSubmit, editCriterio }: Criter
 
             <div className="space-y-2">
               <Label htmlFor="responsavel">Responsável *</Label>
-              <Input
-                id="responsavel"
-                value={formData.responsavel}
-                onChange={(e) => handleChange('responsavel', e.target.value)}
-                placeholder="Ex: João Silva"
-                required
-              />
+              <Select 
+                value={formData.responsavel} 
+                onValueChange={(value) => handleChange('responsavel', value)}
+                disabled={!formData.secretaria || loadingResponsaveis || responsaveisDisponiveis.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={
+                    !formData.secretaria 
+                      ? "Selecione primeiro a secretaria" 
+                      : loadingResponsaveis 
+                        ? "Carregando..." 
+                        : responsaveisDisponiveis.length === 0
+                          ? "Nenhum responsável nesta secretaria"
+                          : "Selecione o responsável"
+                  } />
+                </SelectTrigger>
+                <SelectContent>
+                  {responsaveisDisponiveis.map(user => (
+                    <SelectItem key={user.id} value={user.name}>
+                      {user.name} ({user.username})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {formData.secretaria && responsaveisDisponiveis.length === 0 && !loadingResponsaveis && (
+                <p className="text-sm text-muted-foreground">
+                  Nenhum usuário cadastrado nesta secretaria
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">

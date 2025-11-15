@@ -24,7 +24,7 @@ export const useSupabase = () => {
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout ainda mais rápido
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // Aumentado para 10s
 
       const response = await fetch(`${API_BASE}${endpoint}`, {
         ...options,
@@ -51,7 +51,7 @@ export const useSupabase = () => {
       
       if (err instanceof Error) {
         if (err.name === 'AbortError') {
-          errorMessage = 'Timeout na conexão (3s) - servidor indisponível';
+          errorMessage = 'Timeout na conexão (10s) - servidor indisponível';
         } else if (err.message.includes('Failed to fetch')) {
           errorMessage = 'Não foi possível conectar ao servidor';
         } else if (err.message.includes('NetworkError')) {
