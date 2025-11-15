@@ -4,8 +4,11 @@
   import path from 'path';
 
   export default defineConfig({
-    plugins: [react()],
-    resolve: {
+     build: {
+        chunkSizeWarningLimit: 800, // Set the limit to 800 KB
+      },
+	plugins: [react()],
+   	 resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
       alias: {
         'vaul@1.1.2': 'vaul',
