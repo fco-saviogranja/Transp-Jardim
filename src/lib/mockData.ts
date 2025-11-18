@@ -1,4 +1,4 @@
-import { Criterio, Alerta, Metricas, User } from '../types';
+import { Criterio, Alerta, Metricas, User, Tarefa } from '../types';
 
 // Lista de secretarias do município de Jardim/CE
 export const secretarias = [
@@ -89,225 +89,295 @@ export const mockUsers: User[] = [
   }
 ];
 
+// CRITÉRIOS SÃO TEMPLATES PERIÓDICOS - NÃO SÃO CONCLUÍDOS
 export const mockCriterios: Criterio[] = [
   {
     id: '1',
     nome: 'Taxa de Escolarização Infantil',
     status: 'ativo',
-    valor: 85,
-    meta: 100, // Meta fixa de 100%
-    dataVencimento: '2024-12-31',
-    responsavel: 'João Silva',
+    responsavel: '2', // João Silva
     secretaria: 'Secretaria de Educação',
-    descricao: 'Percentual de crianças de 4 a 5 anos matriculadas na educação infantil',
+    descricao: 'Verificar percentual de crianças de 4 a 5 anos matriculadas na educação infantil',
     periodicidade: 'bimestral',
-    conclusoesPorUsuario: {
-      '2': { concluido: true, dataConclusao: '2024-10-01T10:30:00Z' }
-    }
+    dataCriacao: '2024-01-01T00:00:00Z'
   },
   {
     id: '2',
     nome: 'Cobertura de Saúde Básica',
     status: 'ativo',
-    valor: 92,
-    meta: 100, // Meta fixa de 100%
-    dataVencimento: '2024-11-30',
-    responsavel: 'Maria Santos',
+    responsavel: '3', // Maria Santos
     secretaria: 'Secretaria de Saúde',
-    descricao: 'Percentual da população coberta por serviços básicos de saúde',
+    descricao: 'Verificar percentual da população coberta por serviços básicos de saúde',
     periodicidade: 'mensal',
-    conclusoesPorUsuario: {}
+    dataCriacao: '2024-01-01T00:00:00Z'
   },
   {
     id: '3',
     nome: 'Pavimentação de Vias Urbanas',
-    status: 'pendente',
-    valor: 45,
-    meta: 100, // Meta fixa de 100%
-    dataVencimento: '2024-10-15',
-    responsavel: 'Carlos Oliveira',
+    status: 'ativo',
+    responsavel: '4', // Carlos Oliveira
     secretaria: 'Secretaria de Obras e Infraestrutura',
-    descricao: 'Percentual de vias urbanas pavimentadas no município',
+    descricao: 'Verificar percentual de vias urbanas pavimentadas no município',
     periodicidade: 'semestral',
-    conclusoesPorUsuario: {}
+    dataCriacao: '2024-01-01T00:00:00Z'
   },
   {
     id: '4',
     nome: 'Coleta Seletiva de Resíduos',
-    status: 'vencido',
-    valor: 25,
-    meta: 100, // Meta fixa de 100%
-    dataVencimento: '2024-09-30',
-    responsavel: 'Ana Costa',
+    status: 'ativo',
+    responsavel: '5', // Ana Costa
     secretaria: 'Secretaria de Meio Ambiente',
-    descricao: 'Percentual de resíduos coletados seletivamente',
+    descricao: 'Verificar percentual de resíduos coletados seletivamente',
     periodicidade: '15_dias',
-    conclusoesPorUsuario: {
-      '5': { concluido: false }
-    }
+    dataCriacao: '2024-01-01T00:00:00Z'
   },
   {
     id: '5',
     nome: 'Programa Habitacional Popular',
     status: 'ativo',
-    valor: 78,
-    meta: 100, // Meta fixa de 100%
-    dataVencimento: '2025-03-31',
-    responsavel: 'Pedro Rocha',
+    responsavel: '6', // Pedro Rocha
     secretaria: 'Secretaria de Habitação e Desenvolvimento Social',
-    descricao: 'Percentual de famílias atendidas pelo programa habitacional',
+    descricao: 'Verificar percentual de famílias atendidas pelo programa habitacional',
     periodicidade: 'anual',
-    conclusoesPorUsuario: {}
+    dataCriacao: '2024-01-01T00:00:00Z'
   },
   {
     id: '6',
-    nome: 'Índice de Qualidade da Educação Básica',
+    nome: 'Divulgação da classificação orçamentária por natureza da receita',
     status: 'ativo',
-    valor: 87, // Convertido para percentual
-    meta: 100, // Meta fixa de 100%
-    dataVencimento: '2024-12-31',
-    responsavel: 'João Silva',
-    secretaria: 'Secretaria de Educação',
-    descricao: 'IDEB - Índice de Desenvolvimento da Educação Básica (convertido para percentual)',
-    periodicidade: 'anual',
-    conclusoesPorUsuario: {}
+    responsavel: '8', // Carlos Mendes
+    secretaria: 'Secretaria de Administração e Finanças',
+    descricao: 'Verificar se divulga a classificação orçamentária por natureza da receita (categoria econômica, origem, espécie)',
+    periodicidade: 'mensal',
+    dataCriacao: '2024-01-01T00:00:00Z'
   },
   {
     id: '7',
-    nome: 'Consultas Médicas per capita',
+    nome: 'Divulgação da lista dos inscritos em dívida ativa',
     status: 'ativo',
-    valor: 80, // Convertido para percentual da meta ideal
-    meta: 100, // Meta fixa de 100%
-    dataVencimento: '2024-11-30',
-    responsavel: 'Maria Santos',
-    secretaria: 'Secretaria de Saúde',
-    descricao: 'Percentual de cobertura de consultas médicas baseado na meta ideal',
+    responsavel: '8',
+    secretaria: 'Secretaria de Administração e Finanças',
+    descricao: 'Verificar se divulga a lista dos inscritos em dívida ativa, com nome do inscrito e valor total da dívida',
     periodicidade: 'mensal',
-    conclusoesPorUsuario: {
-      '3': { concluido: true, dataConclusao: '2024-10-05T09:15:00Z' }
-    }
+    dataCriacao: '2024-01-01T00:00:00Z'
   },
-  // Novos critérios de transparência
   {
     id: '8',
-    nome: 'Divulgação da classificação orçamentária por natureza da receita',
+    nome: 'Divulgação do total das despesas empenhadas, liquidadas e pagas',
     status: 'ativo',
-    valor: 90,
-    meta: 100,
-    dataVencimento: '2024-12-31',
-    responsavel: 'Carlos Mendes',
+    responsavel: '8',
     secretaria: 'Secretaria de Administração e Finanças',
-    descricao: 'O Item 3.2 verifica se divulga a classificação orçamentária por natureza da receita (categoria econômica, origem, espécie)?',
+    descricao: 'Verificar se divulga o total das despesas empenhadas, liquidadas e pagas',
     periodicidade: 'mensal',
-    conclusoesPorUsuario: {}
+    dataCriacao: '2024-01-01T00:00:00Z'
   },
   {
     id: '9',
-    nome: 'Divulgação da lista dos inscritos em dívida ativa',
+    nome: 'Consulta de empenhos com detalhes do beneficiário',
     status: 'ativo',
-    valor: 85,
-    meta: 100,
-    dataVencimento: '2024-12-31',
-    responsavel: 'Carlos Mendes',
+    responsavel: '8',
     secretaria: 'Secretaria de Administração e Finanças',
-    descricao: 'O Item 3.3 verifica se divulga a lista dos inscritos em dívida ativa, contendo, no mínimo, dados referentes ao nome do inscrito e o valor total da dívida?',
+    descricao: 'Verificar se possibilita a consulta de empenhos com detalhes do beneficiário, bem/serviço e procedimento licitatório',
     periodicidade: 'mensal',
-    conclusoesPorUsuario: {}
+    dataCriacao: '2024-01-01T00:00:00Z'
   },
   {
     id: '10',
-    nome: 'Divulgação do total das despesas empenhadas, liquidadas e pagas',
+    nome: 'Relatório de Atividades Culturais',
     status: 'ativo',
-    valor: 95,
-    meta: 100,
-    dataVencimento: '2024-12-31',
-    responsavel: 'Carlos Mendes',
-    secretaria: 'Secretaria de Administração e Finanças',
-    descricao: 'O Item 4.1 verifica se divulga o total das despesas empenhadas, liquidadas e pagas?',
-    periodicidade: 'mensal',
-    conclusoesPorUsuario: {}
+    responsavel: '1',
+    secretaria: 'Secretaria de Cultura, Esporte e Lazer',
+    descricao: 'Verificar realização e divulgação de atividades culturais e esportivas',
+    periodicidade: '30_dias',
+    dataCriacao: '2024-01-01T00:00:00Z'
+  }
+];
+
+// TAREFAS SÃO GERADAS PELOS CRITÉRIOS E PODEM SER CONCLUÍDAS
+export const mockTarefas: Tarefa[] = [
+  {
+    id: 'tarefa-1-1',
+    criterioId: '1',
+    criteriNome: 'Taxa de Escolarização Infantil',
+    descricao: 'Verificar percentual de crianças de 4 a 5 anos matriculadas na educação infantil',
+    dataVencimento: '2024-12-15T23:59:59Z',
+    status: 'pendente',
+    responsavel: '2',
+    responsavelNome: 'João Silva',
+    secretaria: 'Secretaria de Educação',
+    dataCriacao: '2024-10-15T00:00:00Z'
   },
   {
-    id: '11',
-    nome: 'Divulgação das despesas por classificação orçamentária',
-    status: 'ativo',
-    valor: 88,
-    meta: 100,
-    dataVencimento: '2024-12-31',
-    responsavel: 'Carlos Mendes',
-    secretaria: 'Secretaria de Administração e Finanças',
-    descricao: 'O Item 4.2 verifica se divulga as despesas por classificação orçamentária?',
-    periodicidade: 'mensal',
-    conclusoesPorUsuario: {}
+    id: 'tarefa-2-1',
+    criterioId: '2',
+    criteriNome: 'Cobertura de Saúde Básica',
+    descricao: 'Verificar percentual da população coberta por serviços básicos de saúde',
+    dataVencimento: '2024-11-30T23:59:59Z',
+    status: 'pendente',
+    responsavel: '3',
+    responsavelNome: 'Maria Santos',
+    secretaria: 'Secretaria de Saúde',
+    dataCriacao: '2024-11-01T00:00:00Z'
   },
   {
-    id: '12',
-    nome: 'Consulta de empenhos com detalhes do beneficiário',
-    status: 'ativo',
-    valor: 80,
-    meta: 100,
-    dataVencimento: '2024-12-31',
-    responsavel: 'Carlos Mendes',
+    id: 'tarefa-2-2',
+    criterioId: '2',
+    criteriNome: 'Cobertura de Saúde Básica',
+    descricao: 'Verificar percentual da população coberta por serviços básicos de saúde',
+    dataVencimento: '2024-10-31T23:59:59Z',
+    status: 'concluida',
+    responsavel: '3',
+    responsavelNome: 'Maria Santos',
+    secretaria: 'Secretaria de Saúde',
+    dataCriacao: '2024-10-01T00:00:00Z',
+    dataConclusao: '2024-10-28T15:30:00Z',
+    concluidaPor: '3'
+  },
+  {
+    id: 'tarefa-4-1',
+    criterioId: '4',
+    criteriNome: 'Coleta Seletiva de Resíduos',
+    descricao: 'Verificar percentual de resíduos coletados seletivamente',
+    dataVencimento: '2024-11-15T23:59:59Z',
+    status: 'pendente',
+    responsavel: '5',
+    responsavelNome: 'Ana Costa',
+    secretaria: 'Secretaria de Meio Ambiente',
+    dataCriacao: '2024-11-01T00:00:00Z'
+  },
+  {
+    id: 'tarefa-4-2',
+    criterioId: '4',
+    criteriNome: 'Coleta Seletiva de Resíduos',
+    descricao: 'Verificar percentual de resíduos coletados seletivamente',
+    dataVencimento: '2024-10-15T23:59:59Z',
+    status: 'vencida',
+    responsavel: '5',
+    responsavelNome: 'Ana Costa',
+    secretaria: 'Secretaria de Meio Ambiente',
+    dataCriacao: '2024-10-01T00:00:00Z'
+  },
+  {
+    id: 'tarefa-6-1',
+    criterioId: '6',
+    criteriNome: 'Divulgação da classificação orçamentária',
+    descricao: 'Verificar se divulga a classificação orçamentária por natureza da receita',
+    dataVencimento: '2024-11-30T23:59:59Z',
+    status: 'pendente',
+    responsavel: '8',
+    responsavelNome: 'Carlos Mendes',
     secretaria: 'Secretaria de Administração e Finanças',
-    descricao: 'O Item 4.3 verifica se possibilita a consulta de empenhos com os detalhes do beneficiário do pagamento ou credor, o bem fornecido ou serviço prestado e a identificação do procedimento licitatório originário da despesa?',
-    periodicidade: 'mensal',
-    conclusoesPorUsuario: {}
+    dataCriacao: '2024-11-01T00:00:00Z'
+  },
+  {
+    id: 'tarefa-6-2',
+    criterioId: '6',
+    criteriNome: 'Divulgação da classificação orçamentária',
+    descricao: 'Verificar se divulga a classificação orçamentária por natureza da receita',
+    dataVencimento: '2024-10-31T23:59:59Z',
+    status: 'concluida',
+    responsavel: '8',
+    responsavelNome: 'Carlos Mendes',
+    secretaria: 'Secretaria de Administração e Finanças',
+    dataCriacao: '2024-10-01T00:00:00Z',
+    dataConclusao: '2024-10-30T16:45:00Z',
+    concluidaPor: '8'
+  },
+  {
+    id: 'tarefa-7-1',
+    criterioId: '7',
+    criteriNome: 'Divulgação da lista dos inscritos em dívida ativa',
+    descricao: 'Verificar se divulga a lista dos inscritos em dívida ativa',
+    dataVencimento: '2024-11-30T23:59:59Z',
+    status: 'pendente',
+    responsavel: '8',
+    responsavelNome: 'Carlos Mendes',
+    secretaria: 'Secretaria de Administração e Finanças',
+    dataCriacao: '2024-11-01T00:00:00Z'
+  },
+  {
+    id: 'tarefa-8-1',
+    criterioId: '8',
+    criteriNome: 'Divulgação do total das despesas',
+    descricao: 'Verificar se divulga o total das despesas empenhadas, liquidadas e pagas',
+    dataVencimento: '2024-11-30T23:59:59Z',
+    status: 'pendente',
+    responsavel: '8',
+    responsavelNome: 'Carlos Mendes',
+    secretaria: 'Secretaria de Administração e Finanças',
+    dataCriacao: '2024-11-01T00:00:00Z'
+  },
+  {
+    id: 'tarefa-10-1',
+    criterioId: '10',
+    criteriNome: 'Relatório de Atividades Culturais',
+    descricao: 'Verificar realização e divulgação de atividades culturais e esportivas',
+    dataVencimento: '2024-11-20T23:59:59Z',
+    status: 'pendente',
+    responsavel: '1',
+    responsavelNome: 'Administrador Sistema',
+    secretaria: 'Secretaria de Cultura, Esporte e Lazer',
+    dataCriacao: '2024-10-20T00:00:00Z'
   }
 ];
 
 export const mockAlertas: Alerta[] = [
   {
     id: '1',
-    criterioId: '4',
+    tarefaId: 'tarefa-4-2',
     tipo: 'vencimento',
-    mensagem: 'Critério "Coleta Seletiva de Resíduos" venceu em 30/09/2024',
+    mensagem: 'Tarefa "Coleta Seletiva de Resíduos" venceu em 15/10/2024',
     prioridade: 'alta',
-    dataEnvio: '2024-10-01T08:00:00Z',
+    dataEnvio: '2024-10-16T08:00:00Z',
     lido: false
   },
   {
     id: '2',
-    criterioId: '3',
-    tipo: 'meta',
-    mensagem: 'Pavimentação de Vias está 25% abaixo da meta estabelecida',
+    tarefaId: 'tarefa-2-1',
+    tipo: 'vencimento',
+    mensagem: 'Tarefa "Cobertura de Saúde Básica" vence em 7 dias',
     prioridade: 'média',
-    dataEnvio: '2024-10-05T10:00:00Z',
+    dataEnvio: '2024-11-23T10:00:00Z',
     lido: false
   },
   {
     id: '3',
-    criterioId: '1',
-    tipo: 'meta',
-    mensagem: 'Taxa de Escolarização próxima da meta (94% alcançado)',
+    tarefaId: 'tarefa-1-1',
+    tipo: 'vencimento',
+    mensagem: 'Tarefa "Taxa de Escolarização Infantil" vence em 15 dias',
     prioridade: 'baixa',
-    dataEnvio: '2024-10-03T14:00:00Z',
-    lido: true
+    dataEnvio: '2024-11-30T14:00:00Z',
+    lido: true,
+    resolvidoPor: '2'
   },
   {
     id: '4',
-    criterioId: '9',
+    tarefaId: 'tarefa-6-1',
     tipo: 'status',
-    mensagem: 'Divulgação da lista de dívida ativa precisa ser atualizada',
+    mensagem: 'Tarefa "Divulgação da classificação orçamentária" precisa ser iniciada',
     prioridade: 'média',
-    dataEnvio: '2024-10-05T16:30:00Z',
+    dataEnvio: '2024-11-15T16:30:00Z',
     lido: false
   },
   {
     id: '5',
-    criterioId: '12',
-    tipo: 'meta',
-    mensagem: 'Consulta de empenhos está 20% abaixo da meta estabelecida',
+    tarefaId: 'tarefa-10-1',
+    tipo: 'vencimento',
+    mensagem: 'Tarefa "Relatório de Atividades Culturais" vence em breve',
     prioridade: 'alta',
-    dataEnvio: '2024-10-06T09:15:00Z',
+    dataEnvio: '2024-11-18T09:15:00Z',
     lido: false
   }
 ];
 
 export const mockMetricas: Metricas = {
-  totalCriterios: 12,
-  ativas: 10,
-  pendentes: 1,
-  vencidas: 1,
+  totalCriterios: 10,
+  criteriosAtivos: 10,
+  criteriosInativos: 0,
+  totalTarefas: 10,
+  tarefasPendentes: 7,
+  tarefasConcluidas: 2,
+  tarefasVencidas: 1,
   percentualCumprimento: 75,
   alertasAtivos: 4
 };

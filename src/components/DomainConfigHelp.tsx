@@ -31,11 +31,11 @@ export function DomainConfigHelp({ showSuccess = false, onDismiss }: DomainConfi
                   Remetente
                 </Badge>
                 <code className="bg-green-100 px-2 py-1 rounded text-xs">
-                  TranspJardim &lt;onboarding@resend.dev&gt;
+                  TranspJardim &lt;controleinterno@transpjardim.tech&gt;
                 </code>
               </div>
               <p className="text-green-700">
-                ✅ Este é um domínio padrão do Resend que funciona imediatamente
+                ✅ E-mail principal do sistema TranspJardim
               </p>
             </div>
           </div>
@@ -91,17 +91,17 @@ export function DomainConfigHelp({ showSuccess = false, onDismiss }: DomainConfi
       </AlertTitle>
       <AlertDescription className="text-blue-700 space-y-3">
         <p>
-          O TranspJardim está configurado para usar <code>onboarding@resend.dev</code> como remetente. 
-          Este é um domínio padrão que funciona imediatamente com novas contas do Resend.
+          O TranspJardim está configurado para usar <code>controleinterno@transpjardim.tech</code> como remetente. 
+          Este é o e-mail principal do sistema da Controladoria Municipal.
         </p>
 
         <div className="space-y-2">
           <div className="flex items-center space-x-2">
             <CheckCircle className="h-4 w-4 text-green-600" />
-            <span className="text-sm font-medium">Configuração Atual (Funciona)</span>
+            <span className="text-sm font-medium">Configuração Atual</span>
           </div>
           <code className="block bg-white p-2 rounded border text-sm">
-            TranspJardim &lt;onboarding@resend.dev&gt;
+            TranspJardim &lt;controleinterno@transpjardim.tech&gt;
           </code>
         </div>
 

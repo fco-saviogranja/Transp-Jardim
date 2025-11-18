@@ -181,14 +181,14 @@ Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para ma
 ## 🏛️ Entidade Responsável
 
 **Controladoria Municipal de Jardim/CE**
-- Website: https://jardim.ce.gov.br
-- Email: controladoria@jardim.ce.gov.br
+- Website: https://transpjardim.tech
+- Email: controleinterno@transpjardim.tech
 - Telefone: (88) 3xxx-xxxx
 
 ## 📞 Suporte
 
 Para suporte técnico:
-- 📧 Email: suporte.transpjardim@jardim.ce.gov.br
+- 📧 Email: controleinterno@transpjardim.tech
 - 📱 WhatsApp: (88) 9xxxx-xxxx
 - 🕒 Horário: Segunda a Sexta, 8h às 17h
 

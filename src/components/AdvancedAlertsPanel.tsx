@@ -61,7 +61,7 @@ export const AdvancedAlertsPanel = ({
       // Filtro de busca
       if (searchTerm) {
         const searchLower = searchTerm.toLowerCase();
-        if (!alerta.mensagem.toLowerCase().includes(searchLower)) {
+        if (!(alerta.mensagem || '').toLowerCase().includes(searchLower)) {
           return false;
         }
       }
@@ -203,7 +203,6 @@ export const AdvancedAlertsPanel = ({
     
     return (
       <div
-        key={alerta.id}
         className={`p-4 rounded-lg border transition-all hover:shadow-md ${
           alerta.lido 
             ? 'bg-gray-50 border-gray-200' 
@@ -321,7 +320,6 @@ export const AdvancedAlertsPanel = ({
     
     return (
       <div
-        key={alerta.id}
         className={`flex items-center gap-3 py-2 px-3 rounded border-l-2 ${
           alerta.lido 
             ? 'bg-gray-50 border-l-gray-300' 
@@ -515,8 +513,16 @@ export const AdvancedAlertsPanel = ({
                   </div>
                   
                   {viewMode === 'card' 
-                    ? filteredAndSortedAlertas.map(renderAlertCard)
-                    : filteredAndSortedAlertas.map(renderCompactAlert)
+                    ? filteredAndSortedAlertas.map(alerta => (
+                        <div key={alerta.id}>
+                          {renderAlertCard(alerta)}
+                        </div>
+                      ))
+                    : filteredAndSortedAlertas.map(alerta => (
+                        <div key={alerta.id}>
+                          {renderCompactAlert(alerta)}
+                        </div>
+                      ))
                   }
                 </div>
               )}

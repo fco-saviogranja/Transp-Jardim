@@ -56,16 +56,64 @@ async function getResendApiKey(): Promise<string | null> {
 async function getTestModeInfo(): Promise<{ testMode: boolean; authorizedEmail?: string }> {
   try {
     const config = await kv.get('config:resend_api_key');
-    if (config && config.testMode) {
-      return {
-        testMode: true,
-        authorizedEmail: config.authorizedEmail
-      };
+    // Se o config não existe ou não tem testMode explícito, assume modo teste com email padrão
+    if (config && config.testMode === false) {
+      return { testMode: false };
     }
-    return { testMode: false };
+    // Por padrão, assume modo teste com o e-mail autorizado
+    return {
+      testMode: true,
+      authorizedEmail: config?.authorizedEmail || 'controleinterno@transpjardim.tech'
+    };
   } catch (error) {
     console.error('Erro ao obter info do modo de teste:', error);
-    return { testMode: false };
+    return { 
+      testMode: true,
+      authorizedEmail: 'controleinterno@transpjardim.tech'
+    };
+  }
+}
+
+// Helper function para parsear resposta do Resend com segurança
+async function parseResendResponse(response: Response): Promise<any> {
+  const contentType = response.headers.get('content-type');
+  
+  console.log(`[ParseResend] Status: ${response.status}, Content-Type: ${contentType}`);
+  
+  try {
+    if (contentType && contentType.includes('application/json')) {
+      const jsonData = await response.json();
+      console.log(`[ParseResend] JSON Response:`, jsonData);
+      return jsonData;
+    } else {
+      // Se não for JSON, pegar como texto
+      const textResponse = await response.text();
+      console.error('❌ [ParseResend] Resposta não-JSON do Resend (primeiros 500 chars):', textResponse.substring(0, 500));
+      
+      // Se for HTML, indicar erro de API Key
+      if (textResponse.includes('<!DOCTYPE') || textResponse.includes('<html')) {
+        console.error('❌ [ParseResend] Detectada resposta HTML - API Key inválida ou expirada');
+        return { 
+          error: 'API Key inválida ou expirada',
+          isHtmlResponse: true,
+          rawResponse: textResponse.substring(0, 200),
+          statusCode: response.status
+        };
+      }
+      
+      console.error('❌ [ParseResend] Resposta texto não-HTML:', textResponse);
+      return { 
+        error: textResponse,
+        parseError: true,
+        statusCode: response.status
+      };
+    }
+  } catch (parseError) {
+    console.error('❌ [ParseResend] Erro ao fazer parsing da resposta:', parseError);
+    return { 
+      error: 'Falha ao processar resposta',
+      parseError: parseError instanceof Error ? parseError.message : 'Erro desconhecido'
+    };
   }
 }
 
@@ -453,30 +501,11 @@ app.post('/make-server-225e1157/auth/login', async (c) => {
 // SISTEMA DE E-MAILS - RESEND
 // ============================================
 
-// Função para detectar e ajustar e-mail em modo de teste
-function adjustEmailForTestMode(originalEmail: string, resendApiKey: string): string {
-  // Se a API key começa com 're_' e tem menos de 40 caracteres, provavelmente está em modo de teste
-  // Para contas novas do Resend, assumir que está em modo de teste
-  const isLikelyTestMode = resendApiKey.startsWith('re_') && resendApiKey.length < 50;
-  
-  if (isLikelyTestMode) {
-    // E-mail autorizado para modo de teste do Resend (baseado no erro observado)
-    const testModeEmail = '2421541@faculdadececape.edu.br';
-    console.log(`🔄 [SERVER] Modo teste detectado: redirecionando ${originalEmail} para ${testModeEmail}`);
-    return testModeEmail;
-  }
-  
-  return originalEmail;
-}
-
-// Função para selecionar domínio de e-mail com fallback
+// Função para selecionar domínio de e-mail
 function getEmailSender(): string {
-  // Tentar domínio personalizado primeiro, depois fallback para resend.dev
-  const customDomain = 'controleinterno@transpjardim.tech';
-  const fallbackDomain = 'Controladoria Jardim <onboarding@resend.dev>';
-  
-  // Por enquanto, usar o fallback que sabemos que funciona
-  return fallbackDomain;
+  // Agora usando domínio personalizado transpjardim.tech (DNS já configurado)
+  const customDomain = 'TranspJardim - Controladoria Geral <controleinterno@transpjardim.tech>';
+  return customDomain;
 }
 
 // Enviar e-mail de alerta
@@ -567,9 +596,34 @@ app.post('/make-server-225e1157/email/send-alert', async (c) => {
     </body>
     </html>`;
     
-    // Ajustar e-mail para modo de teste se necessário
-    const adjustedEmail = adjustEmailForTestMode(to, resendApiKey);
-    const isTestModeRedirect = adjustedEmail !== to;
+    // Verificar se está em modo de teste proativamente
+    const testModeInfo = await getTestModeInfo();
+    console.log(`📧 Modo de teste: ${testModeInfo.testMode ? 'ATIVO' : 'DESATIVADO'}`, testModeInfo.authorizedEmail ? `- Email autorizado: ${testModeInfo.authorizedEmail}` : '');
+    
+    // Se está em modo teste, enviar direto para o e-mail autorizado
+    const emailDestino = testModeInfo.testMode ? testModeInfo.authorizedEmail : to;
+    const isTestModeRedirect = testModeInfo.testMode && to !== testModeInfo.authorizedEmail;
+    
+    // Modificar template se for redirecionamento de teste
+    const emailHtml = isTestModeRedirect 
+      ? htmlTemplate.replace(
+          '<h2>⚠️',
+          `<div style="background: #e3f2fd; border: 2px solid #2196f3; padding: 10px; border-radius: 6px; margin-bottom: 15px;">
+            <p style="margin: 0; color: #1976d2;"><strong>🧪 MODO TESTE:</strong> Este e-mail deveria ser enviado para <strong>${to}</strong></p>
+          </div>
+          <h2>⚠️`
+        )
+      : htmlTemplate;
+    
+    const emailSubject = isTestModeRedirect 
+      ? `TranspJardim: ${subject} [Destinatário: ${to}]`
+      : `TranspJardim: ${subject}`;
+    
+    const emailText = isTestModeRedirect
+      ? `[MODO TESTE - Destinatário original: ${to}]\n\nTranspJardim - ${subject}\n\nCritério: ${criterio?.nome}\nSecretaria: ${criterio?.secretaria}\nResponsável: ${usuario?.name}\nPrazo: ${dueDate ? new Date(dueDate).toLocaleDateString('pt-BR') : 'N/A'}\n\nAcesse: https://transparenciajardim.app`
+      : `TranspJardim - ${subject}\n\nCritério: ${criterio?.nome}\nSecretaria: ${criterio?.secretaria}\nResponsável: ${usuario?.name}\nPrazo: ${dueDate ? new Date(dueDate).toLocaleDateString('pt-BR') : 'N/A'}\n\nAcesse: https://transparenciajardim.app`;
+    
+    console.log(`📤 Enviando para: ${emailDestino}${isTestModeRedirect ? ` (original: ${to})` : ''}`);
     
     // Enviar e-mail via Resend
     const response = await fetch('https://api.resend.com/emails', {
@@ -580,14 +634,36 @@ app.post('/make-server-225e1157/email/send-alert', async (c) => {
       },
       body: JSON.stringify({
         from: getEmailSender(),
-        to: [adjustedEmail],
-        subject: `TranspJardim: ${subject}${isTestModeRedirect ? ' [MODO TESTE]' : ''}`,
-        html: htmlTemplate,
-        text: `TranspJardim - ${subject}\n\nCritério: ${criterio?.nome}\nSecretaria: ${criterio?.secretaria}\nResponsável: ${usuario?.name}\nPrazo: ${dueDate ? new Date(dueDate).toLocaleDateString('pt-BR') : 'N/A'}\n\nAcesse: https://transparenciajardim.app`
+        to: [emailDestino],
+        subject: emailSubject,
+        html: emailHtml,
+        text: emailText
       }),
     });
     
-    const result = await response.json();
+    // Parsear resposta do Resend
+    const result = await parseResendResponse(response);
+    
+    // Verificar se houve erro no parsing
+    if (result.isHtmlResponse) {
+      return c.json({
+        success: false,
+        error: 'API Key do Resend inválida ou expirada',
+        errorType: 'invalid_api_key',
+        details: 'O Resend retornou uma página HTML em vez de JSON. Isso indica que a API Key está incorreta ou expirada.',
+        hint: 'Verifique a API Key do Resend em resend.com/api-keys'
+      }, 401);
+    }
+    
+    if (result.parseError) {
+      return c.json({
+        success: false,
+        error: 'Erro ao processar resposta do Resend',
+        errorType: 'parse_error',
+        details: result.error,
+        hint: 'Verifique se a API Key do Resend está correta e não expirou'
+      }, 500);
+    }
     
     if (!response.ok) {
       console.error('Erro do Resend:', result);
@@ -600,15 +676,18 @@ app.post('/make-server-225e1157/email/send-alert', async (c) => {
         errorMessage = 'API Key do Resend inválida ou expirada';
         errorType = 'invalid_api_key';
       } else if (response.status === 403) {
-        // Verificar se é modo de teste do Resend
+        // Modo de teste ainda detectado após tentativa
         if (result.message && result.message.includes('You can only send testing emails to your own email address')) {
-          console.log('🔵 [SERVER] Modo de teste Resend detectado - API Key válida');
+          console.log('⚠️ [SERVER] Erro 403 persistiu mesmo após verificação de modo teste');
+          console.error('Detalhes do erro 403:', JSON.stringify(result, null, 2));
+          console.error(`Email de destino usado: ${emailDestino}`);
+          console.error(`TestModeInfo: ${JSON.stringify(testModeInfo, null, 2)}`);
           
-          // Extrair o e-mail autorizado da mensagem
+          // Extrair o e-mail autorizado da mensagem como fallback
           const emailMatch = result.message.match(/\(([^)]+)\)/);
-          const authorizedEmail = emailMatch ? emailMatch[1] : '2421541@faculdadececape.edu.br';
+          const authorizedEmail = emailMatch ? emailMatch[1] : testModeInfo.authorizedEmail || 'controleinterno@transpjardim.tech';
           
-          console.log(`📧 [SERVER] Email autorizado detectado: ${authorizedEmail}`);
+          console.log(`📧 [SERVER] Email autorizado detectado na mensagem de erro: ${authorizedEmail}`);
           
           // Tentar enviar novamente para o email autorizado
           try {
@@ -627,9 +706,9 @@ app.post('/make-server-225e1157/email/send-alert', async (c) => {
               }),
             });
             
-            const retryResult = await retryResponse.json();
+            const retryResult = await parseResendResponse(retryResponse);
             
-            if (retryResponse.ok) {
+            if (retryResponse.ok && retryResult.id) {
               console.log(`✅ [SERVER] Email enviado com sucesso para ${authorizedEmail} (modo teste)`);
               
               // Salvar log do e-mail enviado
@@ -706,15 +785,13 @@ app.post('/make-server-225e1157/email/send-alert', async (c) => {
     // Salvar log do e-mail enviado
     const emailLog = {
       id: result.id,
-      to: adjustedEmail,
-      originalTo: to,
+      to: to,
       subject,
       alertType,
       criterioId: criterio?.id,
       usuarioId: usuario?.id,
       sentAt: new Date().toISOString(),
-      status: 'sent',
-      testModeRedirect: isTestModeRedirect
+      status: 'sent'
     };
     
     await kv.set(`email_log:${result.id}`, emailLog);
@@ -722,15 +799,11 @@ app.post('/make-server-225e1157/email/send-alert', async (c) => {
     return c.json({ 
       success: true, 
       emailId: result.id,
-      message: isTestModeRedirect 
-        ? `E-mail enviado em modo de teste (redirecionado para ${adjustedEmail})`
-        : 'E-mail enviado com sucesso',
-      testMode: isTestModeRedirect,
-      authorizedEmail: isTestModeRedirect ? adjustedEmail : undefined
+      message: 'E-mail enviado com sucesso'
     });
     
   } catch (error) {
-    console.error('Erro ao enviar e-mail:', error);
+    console.error('❌ [SEND-ALERT] Erro ao enviar e-mail:', error);
     
     // Determinar tipo específico de erro
     let errorMessage = 'Erro interno do servidor ao enviar e-mail';
@@ -751,6 +824,10 @@ app.post('/make-server-225e1157/email/send-alert', async (c) => {
         errorType = 'send';
       }
     }
+    
+    console.error('❌ [SEND-ALERT] Error type:', errorType);
+    console.error('❌ [SEND-ALERT] Error message:', errorMessage);
+    console.error('❌ [SEND-ALERT] Stack trace:', error instanceof Error ? error.stack : 'N/A');
     
     return c.json({ 
       success: false, 
@@ -833,61 +910,7 @@ app.get('/make-server-225e1157/email/logs', async (c) => {
   }
 });
 
-// Verificar status do domínio
-app.get('/make-server-225e1157/email/domain-status', async (c) => {
-  try {
-    const resendApiKey = await getResendApiKey();
-    if (!resendApiKey) {
-      return c.json({
-        success: false,
-        error: 'RESEND_API_KEY não configurada'
-      }, 500);
-    }
-
-    // Verificar domínio transpjardim.tech
-    const response = await fetch('https://api.resend.com/domains', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${resendApiKey}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    const data = await response.json();
-    
-    if (!response.ok) {
-      return c.json({
-        success: false,
-        error: 'Erro ao verificar domínios',
-        details: data
-      }, response.status);
-    }
-
-    const transparenciaDomain = data.data?.find((domain: any) => 
-      domain.name === 'transpjardim.tech'
-    );
-
-    return c.json({
-      success: true,
-      domain: transparenciaDomain ? {
-        name: transparenciaDomain.name,
-        status: transparenciaDomain.status,
-        verified: transparenciaDomain.status === 'verified'
-      } : null,
-      message: transparenciaDomain 
-        ? `Domínio transpjardim.tech está ${transparenciaDomain.status}`
-        : 'Domínio transpjardim.tech não configurado no Resend',
-      allDomains: data.data?.map((d: any) => ({ name: d.name, status: d.status })) || []
-    });
-  } catch (error) {
-    console.error('Erro ao verificar status do domínio:', error);
-    return c.json({
-      success: false,
-      error: 'Erro interno do servidor',
-      details: error instanceof Error ? error.message : 'Erro desconhecido'
-    }, 500);
-  }
-});
+// Rotas de verificação de domínio removidas - configuração feita diretamente no Resend
 
 // Salvar API Key do Resend
 app.post('/make-server-225e1157/email/save-api-key', async (c) => {
@@ -928,10 +951,10 @@ app.post('/make-server-225e1157/email/save-api-key', async (c) => {
       }),
     });
     
-    const testResult = await testResponse.json();
+    const testResult = await parseResendResponse(testResponse);
     
     // Se for 401, a API Key é inválida
-    if (testResponse.status === 401) {
+    if (testResponse.status === 401 || testResult.isHtmlResponse) {
       return c.json({ 
         success: false, 
         error: 'API Key inválida ou expirada',
@@ -1053,11 +1076,31 @@ app.post('/make-server-225e1157/email/test', async (c) => {
       }, 500);
     }
     
-    // Ajustar e-mail para modo de teste se necessário
-    const adjustedTestEmail = adjustEmailForTestMode(testEmail, resendApiKey);
-    const isTestModeRedirect = adjustedTestEmail !== testEmail;
+    // NOVO: Verificar modo de teste ANTES de enviar
+    const testModeInfo = await getTestModeInfo();
+    console.log(`📧 [TEST] Modo de teste: ${testModeInfo.testMode ? 'ATIVO' : 'DESATIVADO'}`, testModeInfo.authorizedEmail ? `- Email autorizado: ${testModeInfo.authorizedEmail}` : '');
     
-    console.log(`Enviando e-mail de teste para: ${testEmail}${isTestModeRedirect ? ` (redirecionado para ${adjustedTestEmail})` : ''}`);
+    // Decidir para qual e-mail enviar
+    const emailDestino = testModeInfo.testMode ? testModeInfo.authorizedEmail : testEmail;
+    const isTestModeRedirect = testModeInfo.testMode && testEmail !== testModeInfo.authorizedEmail;
+    
+    console.log(`📤 [TEST] Enviando para: ${emailDestino}${isTestModeRedirect ? ` (original: ${testEmail})` : ''}`);
+    
+    // Preparar o template HTML com notificação de modo teste se necessário
+    const testModeNotice = isTestModeRedirect ? `
+            <div style="background: #e3f2fd; border: 2px solid #2196f3; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+              <p style="margin: 0; color: #1976d2;"><strong>🧪 MODO TESTE:</strong></p>
+              <p style="margin: 5px 0; color: #1976d2;">📮 <strong>Enviado para:</strong> ${emailDestino}</p>
+              <p style="margin: 5px 0; font-size: 12px; color: #1565c0;"><em>Em modo teste, e-mails só podem ser enviados para o email cadastrado no Resend.</em></p>
+            </div>` : '';
+    
+    const emailSubject = isTestModeRedirect 
+      ? `TranspJardim - Teste de Configuração [Para: ${testEmail}]`
+      : `TranspJardim - Teste de Configuração`;
+    
+    const emailText = isTestModeRedirect
+      ? `TranspJardim - Teste de E-mail\n\n[MODO TESTE - Destinatário original: ${testEmail}]\n\nSe você recebeu este e-mail, o sistema está funcionando corretamente.\nData/Hora: ${new Date().toLocaleString('pt-BR')}`
+      : `TranspJardim - Teste de E-mail\n\nSe você recebeu este e-mail, o sistema está funcionando corretamente.\nData/Hora: ${new Date().toLocaleString('pt-BR')}`;
     
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -1067,8 +1110,8 @@ app.post('/make-server-225e1157/email/test', async (c) => {
       },
       body: JSON.stringify({
         from: getEmailSender(),
-        to: [adjustedTestEmail],
-        subject: `TranspJardim - Teste de Configuração de E-mail${isTestModeRedirect ? ' [MODO TESTE]' : ''}`,
+        to: [emailDestino],
+        subject: emailSubject,
         html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #4a7c59, #6c9a6f); color: white; padding: 20px; text-align: center; border-radius: 8px;">
@@ -1076,18 +1119,40 @@ app.post('/make-server-225e1157/email/test', async (c) => {
             <p>Controladoria Municipal de Jardim/CE</p>
           </div>
           <div style="background: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-radius: 0 0 8px 8px;">
+            ${testModeNotice}
             <h2>✅ Teste de E-mail Realizado com Sucesso!</h2>
             <p>Se você recebeu este e-mail, significa que o sistema de alertas por e-mail do TranspJardim está funcionando corretamente.</p>
             <p><strong>Data/Hora do Teste:</strong> ${new Date().toLocaleString('pt-BR')}</p>
-            ${isTestModeRedirect ? `<p><strong>🔄 Modo Teste:</strong> E-mail original destinado para <code>${testEmail}</code> foi redirecionado para esta conta autorizada.</p>` : ''}
             <p>O sistema agora pode enviar alertas automáticos para os critérios de transparência.</p>
           </div>
         </div>`,
-        text: `TranspJardim - Teste de E-mail\n\nSe você recebeu este e-mail, o sistema está funcionando corretamente.\nData/Hora: ${new Date().toLocaleString('pt-BR')}`
+        text: emailText
       }),
     });
     
-    const result = await response.json();
+    // Parsear resposta do Resend
+    const result = await parseResendResponse(response);
+    
+    // Verificar se houve erro no parsing
+    if (result.isHtmlResponse) {
+      return c.json({
+        success: false,
+        error: 'API Key do Resend inválida ou expirada',
+        errorType: 'invalid_api_key',
+        details: 'O Resend retornou uma página HTML em vez de JSON. Isso indica que a API Key está incorreta ou expirada.',
+        action: 'Verifique a API Key do Resend em resend.com/api-keys'
+      }, 401);
+    }
+    
+    if (result.parseError) {
+      return c.json({
+        success: false,
+        error: 'Erro ao processar resposta do Resend',
+        errorType: 'parse_error',
+        details: result.error,
+        hint: 'Verifique se a API Key do Resend está correta e não expirou'
+      }, 500);
+    }
     
     if (!response.ok) {
       console.error('Erro no teste de e-mail:', result);
@@ -1144,7 +1209,6 @@ app.post('/make-server-225e1157/email/test', async (c) => {
                     <p><strong>Data/Hora do Teste:</strong> ${new Date().toLocaleString('pt-BR')}</p>
                     <div style="background: #e3f2fd; border: 1px solid #2196f3; padding: 15px; border-radius: 6px; margin: 20px 0;">
                       <p><strong>🔄 Email Redirecionado (Modo Teste):</strong></p>
-                      <p>📧 <strong>Destinatário solicitado:</strong> ${testEmail}</p>
                       <p>📮 <strong>Enviado para:</strong> ${authorizedEmail}</p>
                       <p><em>Contas novas do Resend só podem enviar para o email de cadastro.</em></p>
                     </div>
@@ -1155,9 +1219,9 @@ app.post('/make-server-225e1157/email/test', async (c) => {
               }),
             });
             
-            const retryResult = await retryResponse.json();
+            const retryResult = await parseResendResponse(retryResponse);
             
-            if (retryResponse.ok) {
+            if (retryResponse.ok && retryResult.id) {
               console.log(`✅ [SERVER] Email de teste enviado com sucesso para ${authorizedEmail}`);
               
               return c.json({ 
@@ -1216,18 +1280,20 @@ app.post('/make-server-225e1157/email/test', async (c) => {
       success: true, 
       emailId: result.id,
       message: isTestModeRedirect 
-        ? `E-mail enviado em modo de teste (redirecionado para ${adjustedTestEmail})`
+        ? `E-mail enviado em modo de teste (redirecionado para ${emailDestino})`
         : `E-mail de teste enviado para ${testEmail}`,
       testMode: isTestModeRedirect,
-      authorizedEmail: isTestModeRedirect ? adjustedTestEmail : undefined
+      authorizedEmail: isTestModeRedirect ? emailDestino : undefined
     });
     
   } catch (error) {
-    console.error('Erro no teste de e-mail:', error);
+    console.error('❌ [SERVER] Erro no teste de e-mail:', error);
+    console.error('❌ [SERVER] Stack trace:', error instanceof Error ? error.stack : 'N/A');
     return c.json({ 
       success: false, 
       error: 'Erro interno do servidor',
-      details: error instanceof Error ? error.message : 'Erro desconhecido'
+      details: error instanceof Error ? error.message : 'Erro desconhecido',
+      errorType: 'server_error'
     }, 500);
   }
 });
@@ -1729,69 +1795,744 @@ app.post('/make-server-225e1157/email/notify-users', async (c) => {
             <div class="footer">
                 <p>© 2024 Prefeitura Municipal de Jardim/CE - Controladoria Geral</p>
                 <p>Este e-mail foi enviado automaticamente pelo sistema TranspJardim</p>
-                <p><strong>Remetente:</strong> controleinterno.jardimce@gmail.com</p>
+                <p><strong>Sistema:</strong> TranspJardim - Controladoria Municipal</p>
             </div>
         </div>
     </body>
     </html>`;
     
-    // Enviar e-mail para todos os destinatários
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${resendApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: 'Controladoria Jardim <controleinterno.jardimce@gmail.com>',
-        to: emailsParaEnviar,
-        subject: `TranspJardim: ${subject}`,
-        html: htmlTemplate,
-        text: `TranspJardim - ${subject}\n\nCritério: ${criterio?.nome}\nSecretaria: ${criterio?.secretaria}\nTipo: ${alertType === 'urgent' ? 'URGENTE' : 'AVISO'}\n\nAcesse: https://transparenciajardim.app`
-      }),
-    });
+    // Verificar se está em modo de teste
+    const testModeInfo = await getTestModeInfo();
+    console.log(`📧 Modo de teste: ${testModeInfo.testMode ? 'ATIVO' : 'DESATIVADO'}`, testModeInfo.authorizedEmail ? `- Email autorizado: ${testModeInfo.authorizedEmail}` : '');
     
-    const result = await response.json();
+    // Enviar e-mails individuais para cada destinatário
+    const enviosRealizados = [];
+    const errosEnvio = [];
     
-    if (!response.ok) {
-      console.error('Erro do Resend na notificação em massa:', result);
-      return c.json({ 
-        success: false, 
-        error: 'Falha ao enviar notificações',
-        details: result 
-      }, 500);
+    for (const email of emailsParaEnviar) {
+      try {
+        // Se está em modo teste, enviar direto para o e-mail autorizado
+        const emailDestino = testModeInfo.testMode ? testModeInfo.authorizedEmail : email;
+        const isTestModeRedirect = testModeInfo.testMode && email !== testModeInfo.authorizedEmail;
+        
+        // Modificar template se for redirecionamento de teste
+        const emailHtml = isTestModeRedirect 
+          ? htmlTemplate.replace(
+              '<h2>📋',
+              `<div style="background: #e3f2fd; border: 2px solid #2196f3; padding: 10px; border-radius: 6px; margin-bottom: 15px;">
+                <p style="margin: 0; color: #1976d2;"><strong>🧪 MODO TESTE:</strong> Este e-mail deveria ser enviado para <strong>${email}</strong></p>
+              </div>
+              <h2>📋`
+            )
+          : htmlTemplate;
+        
+        const emailSubject = isTestModeRedirect 
+          ? `TranspJardim: ${subject} [Destinatário: ${email}]`
+          : `TranspJardim: ${subject}`;
+        
+        const emailText = isTestModeRedirect
+          ? `[MODO TESTE - Destinatário original: ${email}]\n\nTranspJardim - ${subject}\n\nCritério: ${criterio?.nome}\nSecretaria: ${criterio?.secretaria}\nTipo: ${alertType === 'urgent' ? 'URGENTE' : 'AVISO'}\n\nAcesse: https://transparenciajardim.app`
+          : `TranspJardim - ${subject}\n\nCritério: ${criterio?.nome}\nSecretaria: ${criterio?.secretaria}\nTipo: ${alertType === 'urgent' ? 'URGENTE' : 'AVISO'}\n\nAcesse: https://transparenciajardim.app`;
+        
+        console.log(`📤 Enviando para: ${emailDestino}${isTestModeRedirect ? ` (original: ${email})` : ''}`);
+        
+        const response = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${resendApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: getEmailSender(),
+            to: [emailDestino],
+            subject: emailSubject,
+            html: emailHtml,
+            text: emailText
+          }),
+        });
+        
+        const result = await parseResendResponse(response);
+        
+        if (response.ok && result.id) {
+          enviosRealizados.push({
+            email: emailDestino,
+            originalEmail: isTestModeRedirect ? email : undefined,
+            id: result.id,
+            status: isTestModeRedirect ? 'sent_test_mode' : 'sent'
+          });
+          console.log(`✅ Notificação enviada para ${emailDestino}${isTestModeRedirect ? ` (original: ${email})` : ''}`);
+        } else {
+          // Se ainda assim falhar, logar o erro
+          errosEnvio.push({
+            email,
+            error: result.message || 'Erro desconhecido',
+            statusCode: response.status
+          });
+          console.error(`❌ Falha ao enviar para ${emailDestino}:`, result);
+        }
+      } catch (error) {
+        errosEnvio.push({
+          email,
+          error: error instanceof Error ? error.message : 'Erro de conexão'
+        });
+        console.error(`❌ Erro ao enviar para ${email}:`, error);
+      }
     }
     
-    console.log(`Notificações enviadas com sucesso. ID: ${result.id}`);
+    console.log(`Notificações processadas: ${enviosRealizados.length} enviadas, ${errosEnvio.length} com erro`);
     
-    // Salvar log das notificações enviadas
-    const emailLog = {
-      id: result.id,
-      to: emailsParaEnviar,
-      recipientCount: emailsParaEnviar.length,
-      subject,
-      alertType,
-      criterioId: criterio?.id,
-      sentAt: new Date().toISOString(),
-      status: 'sent',
-      notificationType: 'mass_notification'
-    };
+    // Salvar logs dos e-mails enviados
+    for (const envio of enviosRealizados) {
+      const emailLog = {
+        id: envio.id,
+        to: envio.email,
+        originalTo: envio.originalEmail || envio.email,
+        subject,
+        alertType,
+        criterioId: criterio?.id,
+        sentAt: new Date().toISOString(),
+        status: envio.status,
+        notificationType: 'mass_notification',
+        testModeRedirect: envio.status === 'sent_test_mode'
+      };
+      
+      await kv.set(`email_log:${envio.id}`, emailLog);
+    }
     
-    await kv.set(`email_log:${result.id}`, emailLog);
-    
-    return c.json({ 
-      success: true, 
-      emailId: result.id,
-      message: `Notificações enviadas para ${emailsParaEnviar.length} usuários`,
-      recipients: emailsParaEnviar.length,
-      emails: emailsParaEnviar
-    });
+    // Retornar resultado
+    if (enviosRealizados.length > 0) {
+      const testModeCount = enviosRealizados.filter(e => e.status === 'sent_test_mode').length;
+      const normalCount = enviosRealizados.filter(e => e.status === 'sent').length;
+      
+      return c.json({ 
+        success: true, 
+        message: testModeCount > 0 
+          ? `Notificações enviadas: ${normalCount} normal, ${testModeCount} redirecionadas (modo teste)`
+          : `Notificações enviadas para ${enviosRealizados.length} usuários`,
+        recipients: enviosRealizados.length,
+        testMode: testModeCount > 0,
+        sentEmails: enviosRealizados,
+        errors: errosEnvio.length > 0 ? errosEnvio : undefined
+      });
+    } else {
+      return c.json({ 
+        success: false, 
+        error: 'Nenhum e-mail foi enviado',
+        errors: errosEnvio
+      }, 500);
+    }
     
   } catch (error) {
     console.error('Erro ao enviar notificações em massa:', error);
     return c.json({ 
       success: false, 
       error: 'Erro interno do servidor',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    }, 500);
+  }
+});
+
+// ============================================
+// ROTAS DE CRITÉRIOS (CRUD)
+// ============================================
+
+// Listar todos os critérios
+app.get('/make-server-225e1157/criterios', async (c) => {
+  try {
+    console.log('📋 Buscando critérios...');
+    const resultados = await kv.getByPrefix('criterio:');
+    
+    // Mapear para retornar apenas os valores (objetos critério)
+    const criterios = resultados.map(item => item.value);
+    
+    console.log(`✅ ${criterios.length} critérios encontrados`);
+    return c.json({ 
+      success: true, 
+      data: criterios,
+      count: criterios.length
+    });
+  } catch (error) {
+    console.error('❌ Erro ao buscar critérios:', error);
+    return c.json({ 
+      success: false, 
+      error: 'Erro ao buscar critérios',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    }, 500);
+  }
+});
+
+// Criar novo critério
+app.post('/make-server-225e1157/criterios', async (c) => {
+  try {
+    const criterioData = await c.req.json();
+    console.log('📝 Criando novo critério:', criterioData.nome);
+    
+    // Gerar ID único
+    const id = `criterio_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    const criterio = {
+      id,
+      ...criterioData,
+      meta: 100, // Meta sempre 100%
+      conclusoesPorUsuario: {}, // Inicializar vazio
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    
+    // Salvar no KV Store
+    await kv.set(`criterio:${id}`, criterio);
+    
+    console.log(`✅ Critério criado com sucesso: ${id}`);
+    return c.json({ 
+      success: true, 
+      data: criterio,
+      message: 'Critério criado com sucesso'
+    });
+  } catch (error) {
+    console.error('❌ Erro ao criar critério:', error);
+    return c.json({ 
+      success: false, 
+      error: 'Erro ao criar critério',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    }, 500);
+  }
+});
+
+// Atualizar critério existente
+app.put('/make-server-225e1157/criterios/:id', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const criterioData = await c.req.json();
+    console.log('📝 Atualizando critério com ID:', id);
+    console.log('📝 Dados recebidos:', JSON.stringify(criterioData, null, 2));
+    
+    // DEBUG: Listar todas as chaves de critérios para debug
+    const todasChaves = await kv.getByPrefix('criterio:');
+    console.log('🔍 Total de critérios no KV:', todasChaves.length);
+    console.log('🔍 Primeiras chaves encontradas:', todasChaves.slice(0, 5).map(c => ({ key: c.key, id: c.value?.id })));
+    
+    // Buscar critério existente
+    const criterioExistente = await kv.get(`criterio:${id}`);
+    
+    if (!criterioExistente) {
+      console.error(`❌ Critério não encontrado com chave: criterio:${id}`);
+      console.error(`❌ Critérios disponíveis:`, todasChaves.map(c => c.value?.id || c.key).slice(0, 10));
+      
+      return c.json({ 
+        success: false, 
+        error: 'Critério não encontrado',
+        debug: {
+          searchedKey: `criterio:${id}`,
+          availableKeys: todasChaves.map(c => c.key).slice(0, 10),
+          availableIds: todasChaves.map(c => c.value?.id).slice(0, 10)
+        }
+      }, 404);
+    }
+    
+    // Atualizar mantendo conclusões
+    const criterioAtualizado = {
+      ...criterioExistente,
+      ...criterioData,
+      id, // Manter ID original
+      meta: 100, // Garantir meta 100%
+      conclusoesPorUsuario: criterioExistente.conclusoesPorUsuario || {},
+      createdAt: criterioExistente.createdAt,
+      updatedAt: new Date().toISOString()
+    };
+    
+    // Salvar no KV Store
+    await kv.set(`criterio:${id}`, criterioAtualizado);
+    
+    console.log(`✅ Critério atualizado com sucesso: ${id}`);
+    return c.json({ 
+      success: true, 
+      data: criterioAtualizado,
+      message: 'Critério atualizado com sucesso'
+    });
+  } catch (error) {
+    console.error('❌ Erro ao atualizar critério:', error);
+    return c.json({ 
+      success: false, 
+      error: 'Erro ao atualizar critério',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    }, 500);
+  }
+});
+
+// Deletar critério
+app.delete('/make-server-225e1157/criterios/:id', async (c) => {
+  try {
+    const id = c.req.param('id');
+    console.log('🗑️ Deletando critério:', id);
+    
+    // Verificar se existe
+    const criterioExistente = await kv.get(`criterio:${id}`);
+    
+    if (!criterioExistente) {
+      return c.json({ 
+        success: false, 
+        error: 'Critério não encontrado'
+      }, 404);
+    }
+    
+    // Deletar do KV Store
+    await kv.del(`criterio:${id}`);
+    
+    console.log(`✅ Critério deletado com sucesso: ${id}`);
+    return c.json({ 
+      success: true, 
+      message: 'Critério deletado com sucesso'
+    });
+  } catch (error) {
+    console.error('❌ Erro ao deletar critério:', error);
+    return c.json({ 
+      success: false, 
+      error: 'Erro ao deletar critério',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    }, 500);
+  }
+});
+
+// Marcar/desmarcar conclusão de critério por usuário
+app.post('/make-server-225e1157/criterios/:id/toggle-completion', async (c) => {
+  try {
+    const criterioId = c.req.param('id');
+    const { userId, completed } = await c.req.json();
+    
+    console.log(`🔄 Alternando conclusão do critério ${criterioId} para usuário ${userId}: ${completed}`);
+    
+    // Buscar critério
+    const criterio = await kv.get(`criterio:${criterioId}`);
+    
+    if (!criterio) {
+      return c.json({ 
+        success: false, 
+        error: 'Critério não encontrado'
+      }, 404);
+    }
+    
+    // Atualizar conclusão do usuário
+    if (!criterio.conclusoesPorUsuario) {
+      criterio.conclusoesPorUsuario = {};
+    }
+    
+    criterio.conclusoesPorUsuario[userId] = {
+      concluido: completed,
+      dataConclusao: completed ? new Date().toISOString() : null
+    };
+    
+    criterio.updatedAt = new Date().toISOString();
+    
+    // Salvar
+    await kv.set(`criterio:${criterioId}`, criterio);
+    
+    console.log(`✅ Conclusão atualizada com sucesso`);
+    return c.json({ 
+      success: true, 
+      data: criterio,
+      message: completed ? 'Critério marcado como concluído' : 'Conclusão revertida'
+    });
+  } catch (error) {
+    console.error('❌ Erro ao atualizar conclusão:', error);
+    return c.json({ 
+      success: false, 
+      error: 'Erro ao atualizar conclusão',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    }, 500);
+  }
+});
+
+// ============================================
+// ROTAS DE ALERTAS
+// ============================================
+
+// Listar todos os alertas
+app.get('/make-server-225e1157/alertas', async (c) => {
+  try {
+    console.log('🔔 Buscando alertas...');
+    const alertas = await kv.getByPrefix('alerta:');
+    
+    // Ordenar por data (mais recentes primeiro)
+    const alertasOrdenados = alertas
+      .map(item => item.value)
+      .sort((a, b) => new Date(b.dataEnvio).getTime() - new Date(a.dataEnvio).getTime());
+    
+    console.log(`✅ ${alertasOrdenados.length} alertas encontrados`);
+    return c.json({ 
+      success: true, 
+      data: alertasOrdenados,
+      count: alertasOrdenados.length
+    });
+  } catch (error) {
+    console.error('❌ Erro ao buscar alertas:', error);
+    return c.json({ 
+      success: false, 
+      error: 'Erro ao buscar alertas',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    }, 500);
+  }
+});
+
+// Criar novo alerta
+app.post('/make-server-225e1157/alertas', async (c) => {
+  try {
+    const alertaData = await c.req.json();
+    console.log('🔔 Criando novo alerta:', alertaData.mensagem);
+    
+    const id = alertaData.id || `alert-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    const alerta = {
+      id,
+      criterioId: alertaData.criterioId,
+      tipo: alertaData.tipo || 'status',
+      mensagem: alertaData.mensagem,
+      prioridade: alertaData.prioridade || 'média',
+      dataEnvio: alertaData.dataEnvio || new Date().toISOString(),
+      lido: alertaData.lido || false,
+      createdAt: new Date().toISOString()
+    };
+    
+    // Salvar no KV Store
+    await kv.set(`alerta:${id}`, alerta);
+    
+    console.log(`✅ Alerta criado com sucesso: ${id}`);
+    return c.json({ 
+      success: true, 
+      data: alerta,
+      message: 'Alerta criado com sucesso'
+    });
+  } catch (error) {
+    console.error('❌ Erro ao criar alerta:', error);
+    return c.json({ 
+      success: false, 
+      error: 'Erro ao criar alerta',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    }, 500);
+  }
+});
+
+// Marcar alerta como lido/não lido
+app.patch('/make-server-225e1157/alertas/:id/toggle-lido', async (c) => {
+  try {
+    const id = c.req.param('id');
+    console.log(`📖 Alternando status de leitura do alerta: ${id}`);
+    
+    const alerta = await kv.get(`alerta:${id}`);
+    
+    if (!alerta) {
+      return c.json({ 
+        success: false, 
+        error: 'Alerta não encontrado'
+      }, 404);
+    }
+    
+    alerta.lido = !alerta.lido;
+    alerta.updatedAt = new Date().toISOString();
+    
+    await kv.set(`alerta:${id}`, alerta);
+    
+    console.log(`✅ Status do alerta atualizado: ${alerta.lido ? 'lido' : 'não lido'}`);
+    return c.json({ 
+      success: true, 
+      data: alerta,
+      message: alerta.lido ? 'Alerta marcado como lido' : 'Alerta marcado como não lido'
+    });
+  } catch (error) {
+    console.error('❌ Erro ao atualizar alerta:', error);
+    return c.json({ 
+      success: false, 
+      error: 'Erro ao atualizar alerta',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    }, 500);
+  }
+});
+
+// Marcar todos os alertas como lidos
+app.post('/make-server-225e1157/alertas/mark-all-read', async (c) => {
+  try {
+    console.log('📖 Marcando todos os alertas como lidos...');
+    
+    const alertas = await kv.getByPrefix('alerta:');
+    let count = 0;
+    
+    for (const item of alertas) {
+      const alerta = item.value;
+      if (!alerta.lido) {
+        alerta.lido = true;
+        alerta.updatedAt = new Date().toISOString();
+        await kv.set(`alerta:${alerta.id}`, alerta);
+        count++;
+      }
+    }
+    
+    console.log(`✅ ${count} alertas marcados como lidos`);
+    return c.json({ 
+      success: true, 
+      count,
+      message: `${count} alertas marcados como lidos`
+    });
+  } catch (error) {
+    console.error('❌ Erro ao marcar alertas como lidos:', error);
+    return c.json({ 
+      success: false, 
+      error: 'Erro ao marcar alertas como lidos',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    }, 500);
+  }
+});
+
+// Deletar alerta
+app.delete('/make-server-225e1157/alertas/:id', async (c) => {
+  try {
+    const id = c.req.param('id');
+    console.log('🗑️ Deletando alerta:', id);
+    
+    const alerta = await kv.get(`alerta:${id}`);
+    
+    if (!alerta) {
+      return c.json({ 
+        success: false, 
+        error: 'Alerta não encontrado'
+      }, 404);
+    }
+    
+    await kv.del(`alerta:${id}`);
+    
+    console.log(`✅ Alerta deletado com sucesso: ${id}`);
+    return c.json({ 
+      success: true, 
+      message: 'Alerta deletado com sucesso'
+    });
+  } catch (error) {
+    console.error('❌ Erro ao deletar alerta:', error);
+    return c.json({ 
+      success: false, 
+      error: 'Erro ao deletar alerta',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    }, 500);
+  }
+});
+
+// Limpar alertas antigos (mais de 30 dias)
+app.post('/make-server-225e1157/alertas/cleanup', async (c) => {
+  try {
+    console.log('🧹 Limpando alertas antigos...');
+    
+    const alertas = await kv.getByPrefix('alerta:');
+    const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+    let count = 0;
+    
+    for (const item of alertas) {
+      const alerta = item.value;
+      const alertDate = new Date(alerta.dataEnvio).getTime();
+      
+      // Deletar se for mais antigo que 30 dias E estiver lido
+      if (alertDate < thirtyDaysAgo && alerta.lido) {
+        await kv.del(`alerta:${alerta.id}`);
+        count++;
+      }
+    }
+    
+    console.log(`✅ ${count} alertas antigos removidos`);
+    return c.json({ 
+      success: true, 
+      count,
+      message: `${count} alertas antigos removidos`
+    });
+  } catch (error) {
+    console.error('❌ Erro ao limpar alertas:', error);
+    return c.json({ 
+      success: false, 
+      error: 'Erro ao limpar alertas',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    }, 500);
+  }
+});
+
+// Deletar TODOS os alertas (reset completo)
+app.post('/make-server-225e1157/alertas/delete-all', async (c) => {
+  try {
+    console.log('🗑️💥 DELETANDO TODOS OS ALERTAS...');
+    
+    const alertas = await kv.getByPrefix('alerta:');
+    let count = 0;
+    
+    for (const item of alertas) {
+      await kv.del(item.key);
+      count++;
+    }
+    
+    console.log(`✅ ${count} alertas deletados com sucesso`);
+    return c.json({ 
+      success: true, 
+      count,
+      message: `${count} alertas deletados com sucesso`
+    });
+  } catch (error) {
+    console.error('❌ Erro ao deletar todos os alertas:', error);
+    return c.json({ 
+      success: false, 
+      error: 'Erro ao deletar todos os alertas',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    }, 500);
+  }
+});
+
+// Deletar TODOS os critérios (reset completo)
+app.post('/make-server-225e1157/criterios/delete-all', async (c) => {
+  try {
+    console.log('🗑️💥 DELETANDO TODOS OS CRITÉRIOS...');
+    
+    const criterios = await kv.getByPrefix('criterio:');
+    let count = 0;
+    
+    for (const item of criterios) {
+      await kv.del(item.key);
+      count++;
+    }
+    
+    console.log(`✅ ${count} critérios deletados com sucesso`);
+    return c.json({ 
+      success: true, 
+      count,
+      message: `${count} critérios deletados com sucesso`
+    });
+  } catch (error) {
+    console.error('❌ Erro ao deletar todos os critérios:', error);
+    return c.json({ 
+      success: false, 
+      error: 'Erro ao deletar todos os critérios',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    }, 500);
+  }
+});
+
+// Processar alertas automáticos com base nos critérios
+app.post('/make-server-225e1157/alertas/process-automatic', async (c) => {
+  try {
+    console.log('🤖 Processando alertas automáticos baseados nos critérios...');
+    
+    // Buscar todos os critérios
+    const criteriosData = await kv.getByPrefix('criterio:');
+    const criterios = criteriosData.map(item => item.value);
+    
+    // Buscar alertas existentes para evitar duplicatas
+    const alertasExistentes = await kv.getByPrefix('alerta:');
+    const hoje = new Date().toISOString().split('T')[0];
+    
+    let novosAlertas = 0;
+    const alertasGerados = [];
+    
+    for (const criterio of criterios) {
+      // Verificar se critério tem data de vencimento
+      if (!criterio.dataVencimento) continue;
+      
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      
+      const dataVencimento = new Date(criterio.dataVencimento);
+      dataVencimento.setHours(0, 0, 0, 0);
+      
+      const diffTime = dataVencimento.getTime() - hoje.getTime();
+      const diasRestantes = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      let deveGerar = false;
+      let tipo = 'status';
+      let prioridade = 'baixa';
+      let mensagem = '';
+      
+      // Vencido
+      if (diasRestantes < 0) {
+        const diasAtrasado = Math.abs(diasRestantes);
+        tipo = 'vencimento';
+        prioridade = 'alta';
+        mensagem = `VENCIDO: Critério "${criterio.nome}" venceu há ${diasAtrasado} dia(s)`;
+        deveGerar = true;
+      }
+      // Vence hoje
+      else if (diasRestantes === 0) {
+        tipo = 'vencimento';
+        prioridade = 'alta';
+        mensagem = `URGENTE: Critério "${criterio.nome}" vence HOJE`;
+        deveGerar = true;
+      }
+      // Vence em 7 dias
+      else if (diasRestantes === 7) {
+        tipo = 'vencimento';
+        prioridade = 'média';
+        mensagem = `Critério "${criterio.nome}" vence em 7 dias`;
+        deveGerar = true;
+      }
+      // Vence em 3 dias
+      else if (diasRestantes === 3) {
+        tipo = 'vencimento';
+        prioridade = 'alta';
+        mensagem = `ATENÇÃO: Critério "${criterio.nome}" vence em 3 dias`;
+        deveGerar = true;
+      }
+      
+      // Verificar meta se houver valor e meta definidos
+      if (criterio.valor !== undefined && criterio.meta !== undefined && criterio.meta > 0) {
+        const percentualAtual = (criterio.valor / criterio.meta) * 100;
+        
+        if (percentualAtual < 25) {
+          tipo = 'meta';
+          prioridade = 'alta';
+          const diferenca = Math.round(100 - percentualAtual);
+          mensagem = `CRÍTICO: Critério "${criterio.nome}" está ${diferenca}% abaixo da meta`;
+          deveGerar = true;
+        } else if (percentualAtual < 50) {
+          tipo = 'meta';
+          prioridade = 'média';
+          const diferenca = Math.round(100 - percentualAtual);
+          mensagem = `AVISO: Critério "${criterio.nome}" está ${diferenca}% abaixo da meta`;
+          deveGerar = true;
+        }
+      }
+      
+      if (deveGerar) {
+        // Verificar se já existe alerta similar hoje
+        const alertaSimilarHoje = alertasExistentes.some(item => {
+          const alerta = item.value;
+          const alertaHoje = alerta.dataEnvio.split('T')[0] === hoje;
+          return alertaHoje && 
+                 alerta.criterioId === criterio.id && 
+                 alerta.tipo === tipo;
+        });
+        
+        if (!alertaSimilarHoje) {
+          const novoAlerta = {
+            id: `alert-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            criterioId: criterio.id,
+            tipo,
+            mensagem,
+            prioridade,
+            dataEnvio: new Date().toISOString(),
+            lido: false,
+            createdAt: new Date().toISOString()
+          };
+          
+          await kv.set(`alerta:${novoAlerta.id}`, novoAlerta);
+          alertasGerados.push(novoAlerta);
+          novosAlertas++;
+          
+          console.log(`✅ Alerta gerado: ${mensagem}`);
+        }
+      }
+    }
+    
+    console.log(`✅ Processamento concluído: ${novosAlertas} novos alertas gerados`);
+    return c.json({ 
+      success: true, 
+      count: novosAlertas,
+      alertas: alertasGerados,
+      message: `${novosAlertas} alertas gerados automaticamente`
+    });
+  } catch (error) {
+    console.error('❌ Erro ao processar alertas automáticos:', error);
+    return c.json({ 
+      success: false, 
+      error: 'Erro ao processar alertas automáticos',
       details: error instanceof Error ? error.message : 'Erro desconhecido'
     }, 500);
   }
@@ -1820,6 +2561,15 @@ app.all('*', (c) => {
       'POST /make-server-225e1157/criterios',
       'PUT /make-server-225e1157/criterios/:id',
       'DELETE /make-server-225e1157/criterios/:id',
+      'POST /make-server-225e1157/criterios/delete-all',
+      'GET /make-server-225e1157/alertas',
+      'POST /make-server-225e1157/alertas',
+      'PATCH /make-server-225e1157/alertas/:id/toggle-lido',
+      'POST /make-server-225e1157/alertas/mark-all-read',
+      'DELETE /make-server-225e1157/alertas/:id',
+      'POST /make-server-225e1157/alertas/cleanup',
+      'POST /make-server-225e1157/alertas/delete-all',
+      'POST /make-server-225e1157/alertas/process-automatic',
       'POST /make-server-225e1157/email/send',
       'POST /make-server-225e1157/email/save-api-key',
       'POST /make-server-225e1157/email/notify-users'

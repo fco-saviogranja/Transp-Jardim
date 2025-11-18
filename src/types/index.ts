@@ -12,34 +12,49 @@ export interface User {
 export interface Criterio {
   id: string;
   nome: string;
-  status: 'ativo' | 'inativo' | 'pendente' | 'vencido';
-  valor: number;
-  meta: number;
-  dataVencimento: string;
+  status: 'ativo' | 'inativo';
   responsavel: string;
   secretaria: string; // Secretaria responsável pelo critério
   descricao: string;
   periodicidade: '15_dias' | '30_dias' | 'mensal' | 'bimestral' | 'semestral' | 'anual';
-  conclusoesPorUsuario?: { [userId: string]: { concluido: boolean; dataConclusao?: string } }; // Rastreamento de conclusão por usuário
+  dataCriacao?: string;
+  dataProximaGeracao?: string; // Quando a próxima tarefa deve ser gerada
+}
+
+export interface Tarefa {
+  id: string;
+  criterioId: string;
+  criteriNome?: string; // Nome do critério para facilitar exibição
+  descricao: string;
+  dataVencimento: string;
+  status: 'pendente' | 'concluida' | 'vencida';
+  responsavel: string; // userId do responsável
+  responsavelNome?: string; // Nome do responsável para exibição
+  secretaria: string;
+  dataConclusao?: string;
+  concluidaPor?: string; // userId de quem concluiu
+  dataCriacao: string;
 }
 
 export interface Alerta {
   id: string;
-  criterioId: string;
+  tarefaId: string; // Alertas são vinculados a tarefas
   tipo: 'vencimento' | 'meta' | 'status';
   mensagem: string;
   prioridade: 'alta' | 'média' | 'baixa';
   dataEnvio: string;
   lido: boolean;
+  resolvidoPor?: string; // userId de quem resolveu/leu o alerta
 }
 
 export interface Metricas {
   totalCriterios: number;
-  ativas: number;
-  pendentes: number;
-  vencidas: number;
+  criteriosAtivos: number;
+  criteriosInativos: number;
+  totalTarefas: number;
+  tarefasPendentes: number;
+  tarefasConcluidas: number;
+  tarefasVencidas: number;
   percentualCumprimento: number;
   alertasAtivos: number;
-  criteriosConcluidos?: number;
-  percentualConclusao?: number;
 }

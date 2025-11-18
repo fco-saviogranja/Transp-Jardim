@@ -36,8 +36,8 @@ export const CriteriosChart = ({ criterios }: CriteriosChartProps) => {
     if (!acc[criterio.secretaria]) {
       acc[criterio.secretaria] = { secretaria: criterio.secretaria, valores: [], metas: [] };
     }
-    acc[criterio.secretaria].valores.push(criterio.valor);
-    acc[criterio.secretaria].metas.push(criterio.meta);
+    acc[criterio.secretaria].valores.push(criterio.valor ?? 0);
+    acc[criterio.secretaria].metas.push(criterio.meta ?? 100);
     return acc;
   }, {} as Record<string, { secretaria: string; valores: number[]; metas: number[] }>);
 

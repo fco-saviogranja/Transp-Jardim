@@ -4,9 +4,11 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { toast } from 'sonner@2.0.3';
-import { Key, CheckCircle, XCircle, AlertTriangle, Mail, ExternalLink, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Key, CheckCircle, XCircle, AlertTriangle, Mail, ExternalLink, Eye, EyeOff, Loader2, Server } from 'lucide-react';
 import { ResendTestModeInfo } from './ResendTestModeInfo';
+import { DnsConfigurationGuide } from './DnsConfigurationGuide';
 
 export function EmailConfigSimple() {
   const [apiKey, setApiKey] = useState('');
@@ -336,6 +338,16 @@ export function EmailConfigSimple() {
       {testModeInfo && (
         <ResendTestModeInfo authorizedEmail={testModeInfo.authorizedEmail} />
       )}
+
+      {/* Guia de Configuração DNS */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">🌐 Configuração DNS</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <DnsConfigurationGuide />
+        </CardContent>
+      </Card>
     </div>
   );
 }

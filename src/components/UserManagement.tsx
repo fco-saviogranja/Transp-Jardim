@@ -104,10 +104,10 @@ export const UserManagement = () => {
   // Filtrar usuários baseado na busca
   const filteredUsers = useMemo(() => {
     return users.filter(user =>
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (user.secretaria && user.secretaria.toLowerCase().includes(searchTerm.toLowerCase()))
+      (user.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (user.username || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (user.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (user.secretaria || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [users, searchTerm]);
 
@@ -570,7 +570,7 @@ export const UserManagement = () => {
                 </TableHeader>
                 <TableBody>
                   {loading ? (
-                    <TableRow>
+                    <TableRow key="loading">
                       <TableCell colSpan={6} className="text-center py-8">
                         <div className="flex items-center justify-center space-x-2">
                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[var(--jardim-green)]"></div>
@@ -579,7 +579,7 @@ export const UserManagement = () => {
                       </TableCell>
                     </TableRow>
                   ) : filteredUsers.length === 0 ? (
-                    <TableRow>
+                    <TableRow key="empty">
                       <TableCell colSpan={6} className="text-center py-8 text-gray-500">
                         {searchTerm ? 'Nenhum usuário encontrado' : 'Nenhum usuário cadastrado'}
                       </TableCell>

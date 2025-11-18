@@ -1,20 +1,17 @@
 import { useState } from 'react';
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { Progress } from './ui/progress';
-import { Download, Search, Filter, Plus, Edit, Trash2, CheckCircle, ChevronDown, History } from 'lucide-react';
+import { Download, Search, Filter, Plus, Edit, Trash2, ChevronDown, ChevronRight, CheckCircle2, Clock, CalendarPlus } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
 import { JardimBreadcrumb } from './JardimBreadcrumb';
-import { Criterio, User } from '../types';
+import { Criterio, User, Tarefa } from '../types';
 import { exportCriteriosToExcel } from '../lib/exportExcel';
 import { CriterioForm } from './CriterioForm';
-import { CriterioCompletionStatus } from './CriterioCompletionStatus';
-import { UserCompletionHistory } from './UserCompletionHistory';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import { JardimLogo } from './JardimLogo';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import logoRedonda from 'figma:asset/f6a9869d371560fae8a34486a3ae60bdf404d376.png';
@@ -22,16 +19,29 @@ import logoRedonda from 'figma:asset/f6a9869d371560fae8a34486a3ae60bdf404d376.pn
 interface CriteriosListProps {
   criterios: Criterio[];
   user?: User | null;
+  tarefas?: Tarefa[]; // Adicionar tarefas
   onAddCriterio?: (criterio: Omit<Criterio, 'id'>) => void;
   onEditCriterio?: (id: string, criterio: Omit<Criterio, 'id'>) => void;
   onDeleteCriterio?: (id: string) => void;
-  onToggleCompletion?: (criterioId: string, completed: boolean) => void;
+  onConcluirTarefa?: (tarefaId: string) => void; // Adicionar handler
+  onCriarTarefa?: (criterioId: string) => void; // Handler para criar nova tarefa
+  onExcluirTarefa?: (tarefaId: string) => void; // Handler para excluir tarefa
 }
 
-export const CriteriosList = ({ criterios, user, onAddCriterio, onEditCriterio, onDeleteCriterio, onToggleCompletion }: CriteriosListProps) => {
+export const CriteriosList = ({ 
+  criterios, 
+  user, 
+  tarefas = [], // Default vazio
+  onAddCriterio, 
+  onEditCriterio, 
+  onDeleteCriterio,
+  onConcluirTarefa,
+  onCriarTarefa,
+  onExcluirTarefa
+}: CriteriosListProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [completionFilter, setCompletionFilter] = useState<string>('all');
+  const [expandedCriterios, setExpandedCriterios] = useState<Set<string>>(new Set());
 
   const [showForm, setShowForm] = useState(false);
   const [editingCriterio, setEditingCriterio] = useState<Criterio | null>(null);
@@ -39,31 +49,18 @@ export const CriteriosList = ({ criterios, user, onAddCriterio, onEditCriterio, 
 
   const isAdmin = user?.role === 'admin';
 
-  // Filtros - incluindo filtro por secretaria do usuário e conclusão
+  // Filtros - incluindo filtro por secretaria do usuário
   const filteredCriterios = criterios.filter(criterio => {
-    const matchesSearch = criterio.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         criterio.secretaria.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         criterio.responsavel.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (criterio.nome || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (criterio.secretaria || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (criterio.responsavel || '').toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesStatus = statusFilter === 'all' || criterio.status === statusFilter;
+    const matchesStatus = statusFilter === 'all' || (criterio.status || 'pendente') === statusFilter;
     
     // Filtro por secretaria: admin vê todos, usuário padrão vê apenas da sua secretaria
-    const matchesSecretaria = isAdmin || !user?.secretaria || criterio.secretaria === user.secretaria;
+    const matchesSecretaria = isAdmin || !user?.secretaria || (criterio.secretaria || '') === user.secretaria;
 
-    // Filtro por conclusão do usuário
-    let matchesCompletion = true;
-    if (user && completionFilter !== 'all') {
-      const userCompletion = criterio.conclusoesPorUsuario?.[user.id];
-      const isCompleted = userCompletion?.concluido || false;
-      
-      if (completionFilter === 'completed') {
-        matchesCompletion = isCompleted;
-      } else if (completionFilter === 'pending') {
-        matchesCompletion = !isCompleted;
-      }
-    }
-
-    return matchesSearch && matchesStatus && matchesSecretaria && matchesCompletion;
+    return matchesSearch && matchesStatus && matchesSecretaria;
   });
 
   const getStatusBadge = (status: string) => {
@@ -126,15 +123,78 @@ export const CriteriosList = ({ criterios, user, onAddCriterio, onEditCriterio, 
     return labels[periodicidade as keyof typeof labels] || periodicidade;
   };
 
-  // Calcular estatísticas de conclusão do usuário
-  const userCompletionStats = user ? {
-    total: filteredCriterios.length,
-    completed: filteredCriterios.filter(c => c.conclusoesPorUsuario?.[user.id]?.concluido).length,
-    pending: filteredCriterios.filter(c => !c.conclusoesPorUsuario?.[user.id]?.concluido).length,
-    percentage: filteredCriterios.length > 0 
-      ? Math.round((filteredCriterios.filter(c => c.conclusoesPorUsuario?.[user.id]?.concluido).length / filteredCriterios.length) * 100)
-      : 0
-  } : null;
+  const toggleExpand = (id: string) => {
+    const newExpanded = new Set(expandedCriterios);
+    if (newExpanded.has(id)) {
+      newExpanded.delete(id);
+    } else {
+      newExpanded.add(id);
+    }
+    setExpandedCriterios(newExpanded);
+  };
+
+  // Obter tarefas de um critério específico
+  const getTarefasByCriterio = (criterioId: string) => {
+    return tarefas.filter(t => t.criterioId === criterioId);
+  };
+
+  // Formatar data de vencimento
+  const formatarDataVencimento = (dataISO: string) => {
+    const data = new Date(dataISO);
+    return data.toLocaleDateString('pt-BR', { 
+      day: '2-digit', 
+      month: '2-digit', 
+      year: 'numeric' 
+    });
+  };
+
+  // Calcular dias para vencimento
+  const calcularDiasVencimento = (dataISO: string) => {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const vencimento = new Date(dataISO);
+    vencimento.setHours(0, 0, 0, 0);
+    const diffTime = vencimento.getTime() - hoje.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
+  // Badge de status da tarefa
+  const getStatusTarefaBadge = (tarefa: Tarefa) => {
+    if (tarefa.status === 'concluida') {
+      return <Badge variant="default" className="bg-green-500">Concluída</Badge>;
+    }
+    if (tarefa.status === 'vencida') {
+      return <Badge variant="destructive">Vencida</Badge>;
+    }
+    
+    const dias = calcularDiasVencimento(tarefa.dataVencimento);
+    if (dias < 0) {
+      return <Badge variant="destructive">Vencida</Badge>;
+    } else if (dias <= 3) {
+      return <Badge variant="destructive" className="bg-orange-500">Vence em {dias} dia{dias !== 1 ? 's' : ''}</Badge>;
+    } else {
+      return <Badge variant="secondary">Pendente</Badge>;
+    }
+  };
+
+  const handleConcluir = async (tarefaId: string) => {
+    if (onConcluirTarefa) {
+      onConcluirTarefa(tarefaId);
+    }
+  };
+
+  const handleCriarTarefa = (criterioId: string) => {
+    if (onCriarTarefa) {
+      onCriarTarefa(criterioId);
+    }
+  };
+
+  const handleExcluirTarefa = (tarefaId: string) => {
+    if (onExcluirTarefa) {
+      onExcluirTarefa(tarefaId);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -163,41 +223,7 @@ export const CriteriosList = ({ criterios, user, onAddCriterio, onEditCriterio, 
             </div>
           </div>
 
-          {/* Estatísticas de Conclusão */}
-          {userCompletionStats && (
-            <div className="bg-white/60 rounded-lg p-4 mb-4 border border-white/80">
-              <div className="flex flex-wrap gap-3">
-                <Badge 
-                  variant="outline" 
-                  className="bg-blue-50 text-blue-700 border-blue-200 cursor-pointer hover:bg-blue-100"
-                  onClick={() => setCompletionFilter('all')}
-                >
-                  Total: {userCompletionStats.total}
-                </Badge>
-                <Badge 
-                  variant="default" 
-                  className="bg-green-600 text-white cursor-pointer hover:bg-green-700"
-                  onClick={() => setCompletionFilter('completed')}
-                >
-                  Concluídos: {userCompletionStats.completed}
-                </Badge>
-                <Badge 
-                  variant="secondary" 
-                  className="bg-orange-100 text-orange-700 border-orange-200 cursor-pointer hover:bg-orange-200"
-                  onClick={() => setCompletionFilter('pending')}
-                >
-                  Pendentes: {userCompletionStats.pending}
-                </Badge>
-                <Badge 
-                  variant={userCompletionStats.percentage >= 70 ? "default" : "destructive"}
-                  className={userCompletionStats.percentage >= 70 ? "bg-green-600 text-white" : ""}
-                >
-                  {userCompletionStats.percentage}% Concluído
-                </Badge>
-              </div>
-            </div>
-          )}
-          
+
           {/* Controles de Busca e Filtros */}
           <div className="bg-white/60 rounded-lg p-4 mb-4 border border-white/80">
             <div className="flex flex-col lg:flex-row gap-3">
@@ -228,18 +254,6 @@ export const CriteriosList = ({ criterios, user, onAddCriterio, onEditCriterio, 
                   </SelectContent>
                 </Select>
 
-                <Select value={completionFilter} onValueChange={setCompletionFilter}>
-                  <SelectTrigger className="w-full sm:w-40">
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    <SelectValue placeholder="Conclusão" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas</SelectItem>
-                    <SelectItem value="completed">Concluídas</SelectItem>
-                    <SelectItem value="pending">Pendentes</SelectItem>
-                  </SelectContent>
-                </Select>
-
                 <Button onClick={handleExport} variant="outline">
                   <Download className="h-4 w-4 mr-2" />
                   Exportar
@@ -255,27 +269,7 @@ export const CriteriosList = ({ criterios, user, onAddCriterio, onEditCriterio, 
             </div>
           </div>
 
-          {/* Seção de Histórico de Conclusões */}
-          {user && userCompletionStats && userCompletionStats.total > 0 && (
-            <div className="bg-white/60 rounded-lg border border-white/80">
-              <Collapsible open={showHistory} onOpenChange={setShowHistory}>
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" className="w-full p-4 flex items-center justify-between hover:bg-white/40">
-                    <div className="flex items-center gap-2">
-                      <History className="h-4 w-4" />
-                      <span>Histórico de Conclusões Pessoais</span>
-                    </div>
-                    <ChevronDown className={`h-4 w-4 transition-transform ${showHistory ? 'rotate-180' : ''}`} />
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="px-4 pb-4">
-                  <div className="bg-white rounded-lg p-3 border">
-                    <UserCompletionHistory criterios={filteredCriterios} user={user} />
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            </div>
-          )}
+
         </CardHeader>
         
         <CardContent>
@@ -283,119 +277,233 @@ export const CriteriosList = ({ criterios, user, onAddCriterio, onEditCriterio, 
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10"></TableHead>
                   <TableHead className="w-72 max-w-72">Nome</TableHead>
                   <TableHead className="w-20">Status</TableHead>
-                  <TableHead className="w-24">Progresso</TableHead>
-                  <TableHead className="w-24">Vencimento</TableHead>
+                  <TableHead className="w-24">Periodicidade</TableHead>
                   <TableHead className="w-24">Secretaria</TableHead>
                   <TableHead className="w-32">Responsável</TableHead>
-                  <TableHead className="w-20">Conclusão</TableHead>
                   {isAdmin && <TableHead className="w-20">Ações</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCriterios.map((criterio) => {
-                  const progress = (criterio.valor / criterio.meta) * 100;
-                  const isUserCompleted = user && criterio.conclusoesPorUsuario?.[user.id]?.concluido;
+                {filteredCriterios.map((criterio, index) => {
+                  const isExpanded = expandedCriterios.has(criterio.id);
+                  const criterioTarefas = getTarefasByCriterio(criterio.id);
                   
                   return (
-                    <TableRow 
-                      key={criterio.id}
-                      className={isUserCompleted ? 'bg-green-50 border-l-4 border-l-green-500' : ''}
-                    >
-                      <TableCell className="font-medium w-72 max-w-72 p-3">
-                        <div className="space-y-2">
-                          <div className="flex items-start gap-2">
-                            <span className="text-sm leading-relaxed break-words hyphens-auto whitespace-pre-wrap">
-                              {criterio.nome}
-                            </span>
-                            {isUserCompleted && (
-                              <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                    <React.Fragment key={criterio.id || `criterio-${index}`}>
+                      <TableRow className="hover:bg-muted/50">
+                        {/* Botão Expandir/Colapsar */}
+                        <TableCell className="p-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => toggleExpand(criterio.id)}
+                            className="h-8 w-8 p-0"
+                          >
+                            {isExpanded ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TableCell>
+
+                        <TableCell className="font-medium w-72 max-w-72 p-3">
+                          <div className="space-y-2">
+                            <div className="flex items-start gap-2">
+                              <span className="text-sm leading-relaxed break-words hyphens-auto whitespace-pre-wrap">
+                                {criterio.nome || 'Sem nome'}
+                              </span>
+                            </div>
+                            <div className="text-xs text-muted-foreground break-words hyphens-auto leading-relaxed whitespace-pre-wrap">
+                              {criterio.descricao || ''}
+                            </div>
+                            {criterioTarefas.length > 0 && (
+                              <div className="text-xs text-[var(--jardim-green)] flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {criterioTarefas.length} tarefa{criterioTarefas.length !== 1 ? 's' : ''}
+                              </div>
                             )}
                           </div>
-                          <div className="text-xs text-muted-foreground break-words hyphens-auto leading-relaxed whitespace-pre-wrap">
-                            {criterio.descricao}
-                          </div>
-                        </div>
-                      </TableCell>
+                        </TableCell>
 
-                      <TableCell>{getStatusBadge(criterio.status)}</TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-sm">
-                            <span>{criterio.valor}%</span>
-                          </div>
-                          <Progress value={progress} className="h-2" />
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {new Date(criterio.dataVencimento).toLocaleDateString('pt-BR')}
-                      </TableCell>
-
-                      <TableCell className="text-sm w-24">
-                        <div className="truncate" title={criterio.secretaria}>
-                          {criterio.secretaria}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm w-32">
-                        <div className="truncate" title={criterio.responsavel}>
-                          {criterio.responsavel}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {user && onToggleCompletion && (
-                          <CriterioCompletionStatus
-                            criterio={criterio}
-                            user={user}
-                            onToggleCompletion={onToggleCompletion}
-                          />
-                        )}
-                      </TableCell>
-                      {isAdmin && (
+                        <TableCell>{getStatusBadge(criterio.status || 'pendente')}</TableCell>
                         <TableCell>
-                          <div className="flex gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openEditForm(criterio)}
-                              className="h-8 w-8 p-0"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Tem certeza que deseja excluir o critério "{criterio.nome}"? 
-                                    Esta ação não pode ser desfeita.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => handleDeleteCriterio(criterio.id)}
-                                    className="bg-red-600 hover:bg-red-700"
-                                  >
-                                    Excluir
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+                          <div className="text-sm">
+                            {getPeriodicidadeLabel(criterio.periodicidade || '')}
                           </div>
                         </TableCell>
+
+                        <TableCell className="text-sm w-24">
+                          <div className="truncate" title={criterio.secretaria || ''}>
+                            {criterio.secretaria || 'N/A'}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm w-32">
+                          <div className="truncate" title={criterio.responsavel || ''}>
+                            {criterio.responsavel || 'N/A'}
+                          </div>
+                        </TableCell>
+                        {isAdmin && (
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleCriarTarefa(criterio.id)}
+                                className="h-8 w-8 p-0 text-[var(--jardim-green)] hover:text-[var(--jardim-green-dark)] hover:bg-[var(--jardim-green-lighter)]"
+                                title="Criar nova tarefa (tarefas são geradas automaticamente)"
+                              >
+                                <CalendarPlus className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openEditForm(criterio)}
+                                className="h-8 w-8 p-0"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Tem certeza que deseja excluir o critério "{criterio.nome}"? 
+                                      Esta ação não pode ser desfeita.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleDeleteCriterio(criterio.id)}
+                                      className="bg-red-600 hover:bg-red-700"
+                                    >
+                                      Excluir
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </TableCell>
+                        )}
+                      </TableRow>
+
+                      {/* Subtabela de Tarefas Expandida */}
+                      {isExpanded && criterioTarefas.length > 0 && (
+                        <TableRow key={`${criterio.id}-tarefas`}>
+                          <TableCell colSpan={isAdmin ? 7 : 6} className="p-0 bg-muted/30">
+                            <div className="p-4">
+                              <div className="text-sm font-medium mb-3 text-[var(--jardim-green)]">
+                                📋 Tarefas do Critério
+                              </div>
+                              <Table className="bg-white">
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead className="w-64">Descrição</TableHead>
+                                    <TableHead className="w-32">Vencimento</TableHead>
+                                    <TableHead className="w-32">Status</TableHead>
+                                    <TableHead className="w-32">Ação</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {criterioTarefas.map((tarefa) => (
+                                    <TableRow key={tarefa.id}>
+                                      <TableCell className="text-sm">
+                                        {tarefa.descricao}
+                                      </TableCell>
+                                      <TableCell className="text-sm">
+                                        <div className="flex items-center gap-2">
+                                          <Clock className="h-4 w-4 text-muted-foreground" />
+                                          {formatarDataVencimento(tarefa.dataVencimento)}
+                                        </div>
+                                      </TableCell>
+                                      <TableCell>
+                                        {getStatusTarefaBadge(tarefa)}
+                                      </TableCell>
+                                      <TableCell>
+                                        <div className="flex gap-2 items-center">
+                                          {tarefa.status !== 'concluida' ? (
+                                            <Button
+                                              variant="default"
+                                              size="sm"
+                                              onClick={() => handleConcluir(tarefa.id)}
+                                              className="bg-[var(--jardim-green)] hover:bg-[var(--jardim-green-dark)]"
+                                            >
+                                              <CheckCircle2 className="h-4 w-4 mr-1" />
+                                              Concluir
+                                            </Button>
+                                          ) : (
+                                            <div className="text-xs text-muted-foreground">
+                                              Concluída em {tarefa.dataConclusao ? formatarDataVencimento(tarefa.dataConclusao) : '-'}
+                                            </div>
+                                          )}
+                                          
+                                          {/* Botão Excluir - apenas para administradores */}
+                                          {isAdmin && (
+                                            <AlertDialog>
+                                              <AlertDialogTrigger asChild>
+                                                <Button
+                                                  variant="ghost"
+                                                  size="sm"
+                                                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                  title="Excluir tarefa"
+                                                >
+                                                  <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                              </AlertDialogTrigger>
+                                              <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                  <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                                                  <AlertDialogDescription>
+                                                    Tem certeza que deseja excluir esta tarefa? 
+                                                    Esta ação não pode ser desfeita.
+                                                  </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                  <AlertDialogAction
+                                                    onClick={() => handleExcluirTarefa(tarefa.id)}
+                                                    className="bg-red-600 hover:bg-red-700"
+                                                  >
+                                                    Excluir
+                                                  </AlertDialogAction>
+                                                </AlertDialogFooter>
+                                              </AlertDialogContent>
+                                            </AlertDialog>
+                                          )}
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </TableCell>
+                        </TableRow>
                       )}
-                    </TableRow>
+
+                      {/* Mensagem quando expandido mas sem tarefas */}
+                      {isExpanded && criterioTarefas.length === 0 && (
+                        <TableRow key={`${criterio.id}-sem-tarefas`}>
+                          <TableCell colSpan={isAdmin ? 7 : 6} className="p-4 bg-muted/30 text-center text-sm text-muted-foreground">
+                            Nenhuma tarefa gerada para este critério ainda.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </React.Fragment>
                   );
                 })}
               </TableBody>
@@ -408,36 +516,13 @@ export const CriteriosList = ({ criterios, user, onAddCriterio, onEditCriterio, 
             )}
           </div>
 
-          {/* Resumo de Conclusões */}
-          {user && filteredCriterios.length > 0 && (
+          {/* Resumo */}
+          {filteredCriterios.length > 0 && (
             <div className="mt-4 p-4 bg-gray-50 rounded-lg border">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="text-sm">
-                    <span className="font-medium">Resumo:</span> {filteredCriterios.length} critério(s) encontrado(s)
-                  </div>
-                  {userCompletionStats && (
-                    <div className="flex items-center gap-3 text-sm">
-                      <div className="flex items-center gap-1">
-                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                        <span>{userCompletionStats.completed} concluído(s)</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <div className="w-3 h-3 bg-orange-400 rounded-full"></div>
-                        <span>{userCompletionStats.pending} pendente(s)</span>
-                      </div>
-                    </div>
-                  )}
+              <div className="flex items-center justify-between">
+                <div className="text-sm">
+                  <span className="font-medium">Total:</span> {filteredCriterios.length} critério(s) encontrado(s)
                 </div>
-                
-                {userCompletionStats && userCompletionStats.total > 0 && (
-                  <div className="text-sm">
-                    <span className="font-medium">Taxa de conclusão:</span>{' '}
-                    <span className={`font-bold ${userCompletionStats.percentage >= 70 ? 'text-green-600' : 'text-orange-600'}`}>
-                      {userCompletionStats.percentage}%
-                    </span>
-                  </div>
-                )}
               </div>
             </div>
           )}

@@ -17,6 +17,7 @@ import { EmailTestButton } from './EmailTestButton';
 import { EmailStatusIndicator } from './EmailStatusIndicator';
 import { SimpleEmailTest } from './SimpleEmailTest';
 import { EmailConfigSimple } from './EmailConfigSimple';
+import { DataCleanupPanel } from './DataCleanupPanel';
 import { useSupabase } from '../hooks/useSupabase';
 import { JardimLogo } from './JardimLogo';
 import { mockCriterios, mockAlertas } from '../lib/mockData';
@@ -125,6 +126,13 @@ export const AdminPanel = ({ onNavigate }: AdminPanelProps) => {
       description: 'Testar e debugar sistema de alertas',
       icon: AlertTriangle,
       action: 'alerts-debug'
+    },
+    {
+      title: 'Limpeza de Dados',
+      description: 'Deletar critérios e alertas do sistema',
+      icon: Database,
+      action: 'cleanup',
+      variant: 'danger' as const
     }
   ];
 
@@ -148,6 +156,9 @@ export const AdminPanel = ({ onNavigate }: AdminPanelProps) => {
     } else if (action === 'alerts-debug') {
       console.log('[AdminPanel] Executando: setCurrentView(alerts-debug)');
       setCurrentView('alerts-debug');
+    } else if (action === 'cleanup') {
+      console.log('[AdminPanel] Executando: setCurrentView(cleanup)');
+      setCurrentView('cleanup');
     } else {
       // Em produção, navegaria para outras telas específicas
       console.log(`Ação administrativa: ${action}`);
@@ -257,6 +268,8 @@ export const AdminPanel = ({ onNavigate }: AdminPanelProps) => {
           ]}
           onHomeClick={() => onNavigate ? onNavigate('dashboard') : setCurrentView('dashboard')}
         />
+        
+        {/* Configuração de E-mail */}
         <div className="bg-white rounded-lg p-6 shadow-sm border border-[var(--border)]">
           <EmailConfigSimple />
         </div>
@@ -277,6 +290,39 @@ export const AdminPanel = ({ onNavigate }: AdminPanelProps) => {
         />
         <div className="bg-white rounded-lg p-6 shadow-sm border border-[var(--border)]">
           <AlertsDebugPanel onClose={() => setCurrentView('dashboard')} />
+        </div>
+      </div>
+    );
+  }
+
+  if (currentView === 'cleanup') {
+    console.log('[AdminPanel] Renderizando view: cleanup');
+    return (
+      <div className="space-y-6">
+        <JardimBreadcrumb 
+          items={[
+            { label: 'Administração', onClick: () => setCurrentView('dashboard') },
+            { label: 'Limpeza de Dados' }
+          ]}
+          onHomeClick={() => onNavigate ? onNavigate('dashboard') : setCurrentView('dashboard')}
+        />
+        <div className="space-y-4">
+          <div className="bg-white rounded-lg p-6 shadow-sm border border-[var(--border)]">
+            <h2 className="text-xl mb-4">Limpeza de Dados do Sistema</h2>
+            <p className="text-muted-foreground mb-4">
+              Use estas ferramentas para deletar critérios e alertas do banco de dados. 
+              Estas ações são <strong>permanentes e irreversíveis</strong>.
+            </p>
+          </div>
+          <DataCleanupPanel />
+          <div className="flex justify-start">
+            <Button 
+              variant="outline" 
+              onClick={() => setCurrentView('dashboard')}
+            >
+              Voltar ao Dashboard
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -350,25 +396,36 @@ export const AdminPanel = ({ onNavigate }: AdminPanelProps) => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {adminActions.map((action, index) => {
               const Icon = action.icon;
+              const isDanger = action.variant === 'danger';
               
               return (
                 <Card 
                   key={index} 
-                  className="cursor-pointer hover:shadow-lg transition-shadow"
+                  className={`cursor-pointer hover:shadow-lg transition-shadow ${
+                    isDanger ? 'border-red-300 bg-red-50/30' : ''
+                  }`}
                   onClick={() => handleAction(action.action)}
                 >
                   <CardHeader>
                     <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-[var(--jardim-green-lighter)]">
-                        <Icon className="h-5 w-5 text-[var(--jardim-green)]" />
+                      <div className={`p-2 rounded-lg ${
+                        isDanger ? 'bg-red-100' : 'bg-[var(--jardim-green-lighter)]'
+                      }`}>
+                        <Icon className={`h-5 w-5 ${
+                          isDanger ? 'text-red-600' : 'text-[var(--jardim-green)]'
+                        }`} />
                       </div>
-                      <CardTitle className="text-base">
+                      <CardTitle className={`text-base ${
+                        isDanger ? 'text-red-700' : ''
+                      }`}>
                         {action.title}
                       </CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm text-muted-foreground">
+                    <p className={`text-sm ${
+                      isDanger ? 'text-red-600' : 'text-muted-foreground'
+                    }`}>
                       {action.description}
                     </p>
                   </CardContent>

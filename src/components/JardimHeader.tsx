@@ -1,4 +1,4 @@
-import { User, Menu, X, Home, FileText, Bell, Settings, BarChart3, Eye, Accessibility, Phone, AlertTriangle } from 'lucide-react';
+import { User, Menu, X, Home, FileText, Bell, Settings, BarChart3, Eye, Accessibility, Phone, AlertTriangle, CheckSquare } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { useState } from 'react';

@@ -225,7 +225,7 @@ export function EmailConfigPanel({ onClose }: EmailConfigPanelProps) {
                     <span className="font-medium">Remetente</span>
                   </div>
                   <p className="text-sm text-muted-foreground">TranspJardim</p>
-                  <p className="text-xs text-muted-foreground">onboarding@resend.dev</p>
+                  <p className="text-xs text-muted-foreground">controleinterno@transpjardim.tech</p>
                 </Card>
               </div>
             </CardContent>

@@ -1,66 +1,56 @@
 import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { Progress } from './ui/progress';
-import { Criterio, User } from '../types';
-import { TrendingUp, TrendingDown, Calendar, Users, Target, AlertTriangle } from 'lucide-react';
+import { Criterio, User, Alerta } from '../types';
+import { Calendar, Users, Target, AlertTriangle, Trophy, TrendingUp } from 'lucide-react';
 
 interface AdvancedMetricsProps {
   criterios: Criterio[];
   user: User | null;
+  alertas?: Alerta[];
+  usuarios?: User[];
 }
 
-export const AdvancedMetrics = ({ criterios, user }: AdvancedMetricsProps) => {
+export const AdvancedMetrics = ({ criterios, user, alertas = [], usuarios = [] }: AdvancedMetricsProps) => {
   const metrics = useMemo(() => {
     if (!criterios.length) {
       return {
         performancePorSecretaria: [],
-        tendencias: {
-          melhorias: 0,
-          declinio: 0,
-          estavel: 0
-        },
         proximosVencimentos: [],
-        eficienciaPorPeriodicidade: {},
-        statusDistribution: {
-          ativo: 0,
-          pendente: 0,
-          vencido: 0,
-          inativo: 0
-        }
+        statusDistribution: {},
+        performancePorUsuario: []
       };
     }
 
-    // Calcular performance por secretaria
-    const secretariasMap = new Map<string, { total: number; valor: number; concluidos: number }>();
+    // Performance por Secretaria (baseado em valor/meta dos critérios)
+    const secretariasMap = new Map<string, { total: number; valor: number }>();
     
     criterios.forEach(criterio => {
+      if (!criterio.secretaria) return;
+      
       const key = criterio.secretaria;
-      const current = secretariasMap.get(key) || { total: 0, valor: 0, concluidos: 0 };
-      const isConcluido = user ? criterio.conclusoesPorUsuario?.[user.id]?.concluido || false : false;
+      const current = secretariasMap.get(key) || { total: 0, valor: 0 };
       
       secretariasMap.set(key, {
         total: current.total + 1,
-        valor: current.valor + criterio.valor,
-        concluidos: current.concluidos + (isConcluido ? 1 : 0)
+        valor: current.valor + (criterio.valor ?? 0)
       });
     });
 
     const performancePorSecretaria = Array.from(secretariasMap.entries()).map(([secretaria, data]) => ({
-      secretaria: secretaria.replace('Secretaria de ', ''),
+      secretaria: secretaria ? secretaria.replace('Secretaria de ', '') : 'Sem Secretaria',
       performance: Math.round((data.valor / data.total) || 0),
-      concluidos: data.concluidos,
-      total: data.total,
-      percentualConclusao: Math.round((data.concluidos / data.total) * 100)
+      total: data.total
     })).sort((a, b) => b.performance - a.performance);
 
-    // Calcular próximos vencimentos (próximos 30 dias)
+    // Próximos Vencimentos (critérios que precisam de atenção)
     const hoje = new Date();
     const proximoMes = new Date();
     proximoMes.setDate(hoje.getDate() + 30);
 
     const proximosVencimentos = criterios
       .filter(c => {
+        if (!c.dataVencimento) return false;
         const vencimento = new Date(c.dataVencimento);
         return vencimento >= hoje && vencimento <= proximoMes && c.status !== 'vencido';
       })
@@ -69,47 +59,102 @@ export const AdvancedMetrics = ({ criterios, user }: AdvancedMetricsProps) => {
 
     // Distribuição por status
     const statusDistribution = criterios.reduce((acc, c) => {
-      acc[c.status] = (acc[c.status] || 0) + 1;
+      const status = c.status || 'inativo';
+      acc[status] = (acc[status] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
 
-    // Eficiência por periodicidade
-    const periodicidadeMap = new Map<string, { total: number; valor: number }>();
-    criterios.forEach(c => {
-      const key = c.periodicidade;
-      const current = periodicidadeMap.get(key) || { total: 0, valor: 0 };
-      periodicidadeMap.set(key, {
-        total: current.total + 1,
-        valor: current.valor + c.valor
+    // Performance por Usuário
+    // Analisa quantas tarefas cada usuário concluiu e quantos alertas foram resolvidos
+    const usuariosPerformance = new Map<string, {
+      nome: string;
+      tarefasConcluidas: number;
+      tarefasDentroDoPrazo: number;
+      alertasResolvidos: number;
+      secretaria?: string;
+    }>();
+
+    // Inicializar com todos os usuários
+    usuarios.forEach(u => {
+      usuariosPerformance.set(u.id, {
+        nome: u.name,
+        tarefasConcluidas: 0,
+        tarefasDentroDoPrazo: 0,
+        alertasResolvidos: 0,
+        secretaria: u.secretaria
       });
     });
 
-    const eficienciaPorPeriodicidade = Object.fromEntries(
-      Array.from(periodicidadeMap.entries()).map(([key, data]) => [
-        key,
-        Math.round(data.valor / data.total)
-      ])
-    );
+    // Analisar conclusões de tarefas por critério
+    criterios.forEach(criterio => {
+      if (!criterio.conclusoesPorUsuario) return;
+
+      Object.entries(criterio.conclusoesPorUsuario).forEach(([userId, conclusao]) => {
+        if (!conclusao.concluido) return;
+
+        const userPerf = usuariosPerformance.get(userId);
+        if (!userPerf) {
+          // Se o usuário não está na lista, criar entrada
+          usuariosPerformance.set(userId, {
+            nome: 'Usuário Desconhecido',
+            tarefasConcluidas: 1,
+            tarefasDentroDoPrazo: 0,
+            alertasResolvidos: 0
+          });
+        } else {
+          userPerf.tarefasConcluidas++;
+
+          // Verificar se foi concluído dentro do prazo
+          if (conclusao.dataConclusao && criterio.dataVencimento) {
+            const dataConclusao = new Date(conclusao.dataConclusao);
+            const dataVencimento = new Date(criterio.dataVencimento);
+            
+            if (dataConclusao <= dataVencimento) {
+              userPerf.tarefasDentroDoPrazo++;
+            }
+          }
+        }
+      });
+    });
+
+    // Analisar alertas resolvidos (alertas que foram lidos)
+    alertas.forEach(alerta => {
+      if (alerta.lido) {
+        // Encontrar o critério relacionado
+        const criterio = criterios.find(c => c.id === alerta.criterioId);
+        if (criterio?.responsavel) {
+          const userPerf = usuariosPerformance.get(criterio.responsavel);
+          if (userPerf) {
+            userPerf.alertasResolvidos++;
+          }
+        }
+      }
+    });
+
+    const performancePorUsuario = Array.from(usuariosPerformance.entries())
+      .map(([userId, data]) => ({
+        userId,
+        nome: data.nome,
+        tarefasConcluidas: data.tarefasConcluidas,
+        tarefasDentroDoPrazo: data.tarefasDentroDoPrazo,
+        alertasResolvidos: data.alertasResolvidos,
+        secretaria: data.secretaria,
+        percentualNoPrazo: data.tarefasConcluidas > 0 
+          ? Math.round((data.tarefasDentroDoPrazo / data.tarefasConcluidas) * 100)
+          : 0,
+        pontuacao: (data.tarefasDentroDoPrazo * 3) + (data.alertasResolvidos * 1) // Peso: tarefas no prazo valem mais
+      }))
+      .filter(u => u.tarefasConcluidas > 0 || u.alertasResolvidos > 0) // Mostrar apenas usuários ativos
+      .sort((a, b) => b.pontuacao - a.pontuacao)
+      .slice(0, 10); // Top 10 usuários
 
     return {
       performancePorSecretaria,
       proximosVencimentos,
-      eficienciaPorPeriodicidade,
-      statusDistribution
+      statusDistribution,
+      performancePorUsuario
     };
-  }, [criterios, user]);
-
-  const getPeriodicidadeLabel = (periodicidade: string) => {
-    const labels = {
-      '15_dias': '15 dias',
-      '30_dias': '30 dias',
-      'mensal': 'Mensal',
-      'bimestral': 'Bimestral',
-      'semestral': 'Semestral',
-      'anual': 'Anual'
-    };
-    return labels[periodicidade as keyof typeof labels] || periodicidade;
-  };
+  }, [criterios, alertas, usuarios]);
 
   const getDiasParaVencimento = (dataVencimento: string) => {
     const hoje = new Date();
@@ -138,34 +183,101 @@ export const AdvancedMetrics = ({ criterios, user }: AdvancedMetricsProps) => {
 
   return (
     <div className="space-y-6">
+      {/* Performance por Usuário - DESTAQUE */}
+      {metrics.performancePorUsuario.length > 0 && (
+        <Card className="border-primary/50 shadow-md">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-amber-600" />
+              Ranking de Performance por Usuário
+            </CardTitle>
+            <CardDescription>
+              Usuários com melhor desempenho em conclusão de tarefas e resolução de alertas
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {metrics.performancePorUsuario.map((usuario, index) => (
+                <div 
+                  key={usuario.userId} 
+                  className={`flex items-center justify-between p-4 rounded-lg border ${
+                    index === 0 ? 'bg-amber-50 border-amber-200' :
+                    index === 1 ? 'bg-slate-50 border-slate-200' :
+                    index === 2 ? 'bg-orange-50 border-orange-200' :
+                    'bg-muted'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
+                      index === 0 ? 'bg-amber-500 text-white' :
+                      index === 1 ? 'bg-slate-400 text-white' :
+                      index === 2 ? 'bg-orange-500 text-white' :
+                      'bg-gray-300 text-gray-700'
+                    }`}>
+                      {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : index + 1}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium">{usuario.nome}</p>
+                      {usuario.secretaria && (
+                        <p className="text-xs text-muted-foreground">{usuario.secretaria}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground">Tarefas</p>
+                      <p className="font-semibold text-green-600">{usuario.tarefasConcluidas}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground">No Prazo</p>
+                      <p className="font-semibold text-blue-600">{usuario.tarefasDentroDoPrazo}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground">Alertas</p>
+                      <p className="font-semibold text-orange-600">{usuario.alertasResolvidos}</p>
+                    </div>
+                    <div className="text-center min-w-[60px]">
+                      <p className="text-xs text-muted-foreground">Taxa</p>
+                      <div className="flex items-center gap-1">
+                        <p className="font-semibold">{usuario.percentualNoPrazo}%</p>
+                        {usuario.percentualNoPrazo >= 80 && (
+                          <TrendingUp className="w-3 h-3 text-green-600" />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Performance por Secretaria */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Target className="w-5 h-5" />
-            Performance por Secretaria
+            Desempenho por Secretaria
           </CardTitle>
           <CardDescription>
-            Desempenho médio de cada secretaria na execução dos critérios
+            Média de desempenho dos critérios por secretaria
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="space-y-3">
             {metrics.performancePorSecretaria.map((item, index) => (
-              <div key={item.secretaria} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">{item.secretaria}</span>
-                    <Badge variant="outline" className="text-xs">
-                      {item.concluidos}/{item.total} concluídos
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">{item.performance}%</span>
-                    {index === 0 && <TrendingUp className="w-4 h-4 text-green-600" />}
-                  </div>
+              <div key={item.secretaria} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                <div className="flex items-center gap-2 flex-1">
+                  <span className="text-sm font-medium">{item.secretaria}</span>
+                  <Badge variant="outline" className="text-xs">
+                    {item.total} critério{item.total !== 1 ? 's' : ''}
+                  </Badge>
                 </div>
-                <Progress value={item.performance} className="h-2" />
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-sm">{item.performance}%</span>
+                  {index === 0 && <TrendingUp className="w-4 h-4 text-green-600" />}
+                </div>
               </div>
             ))}
           </div>
@@ -180,7 +292,7 @@ export const AdvancedMetrics = ({ criterios, user }: AdvancedMetricsProps) => {
             Próximos Vencimentos
           </CardTitle>
           <CardDescription>
-            Critérios que vencem nos próximos 30 dias
+            Critérios que precisam de atenção nos próximos 30 dias
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -191,8 +303,8 @@ export const AdvancedMetrics = ({ criterios, user }: AdvancedMetricsProps) => {
                 return (
                   <div key={criterio.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                     <div className="flex-1">
-                      <p className="font-medium text-sm">{criterio.nome}</p>
-                      <p className="text-xs text-muted-foreground">{criterio.secretaria}</p>
+                      <p className="font-medium text-sm">{criterio.nome || 'Sem nome'}</p>
+                      <p className="text-xs text-muted-foreground">{criterio.secretaria || 'Sem secretaria'}</p>
                     </div>
                     <div className="text-right">
                       <Badge variant={dias <= 7 ? "destructive" : dias <= 15 ? "secondary" : "outline"}>
@@ -211,57 +323,30 @@ export const AdvancedMetrics = ({ criterios, user }: AdvancedMetricsProps) => {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Distribuição por Status */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5" />
-              Distribuição por Status
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {Object.entries(metrics.statusDistribution).map(([status, count]) => (
-                <div key={status} className="flex items-center justify-between">
-                  <Badge className={getStatusColor(status)}>
-                    {status.toUpperCase()}
-                  </Badge>
-                  <span className="font-medium">{count}</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Eficiência por Periodicidade */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="w-5 h-5" />
-              Eficiência por Periodicidade
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {Object.entries(metrics.eficienciaPorPeriodicidade).map(([periodicidade, eficiencia]) => (
-                <div key={periodicidade} className="flex items-center justify-between">
-                  <span className="text-sm">{getPeriodicidadeLabel(periodicidade)}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{eficiencia}%</span>
-                    <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-primary rounded-full transition-all"
-                        style={{ width: `${eficiencia}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Distribuição por Status */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5" />
+            Distribuição por Status
+          </CardTitle>
+          <CardDescription>
+            Visão geral do status dos critérios periódicos
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {Object.entries(metrics.statusDistribution).map(([status, count]) => (
+              <div key={status} className="flex flex-col items-center gap-2 p-3 bg-muted rounded-lg">
+                <Badge className={getStatusColor(status)}>
+                  {status.toUpperCase()}
+                </Badge>
+                <span className="text-2xl font-bold">{count}</span>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

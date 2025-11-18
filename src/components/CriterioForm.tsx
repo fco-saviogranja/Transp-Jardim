@@ -21,10 +21,7 @@ interface CriterioFormProps {
 export const CriterioForm = ({ isOpen, onClose, onSubmit, editCriterio }: CriterioFormProps) => {
   const [formData, setFormData] = useState({
     nome: '',
-    status: 'ativo' as 'ativo' | 'inativo' | 'pendente' | 'vencido',
-    valor: 0,
-    meta: 100, // Meta sempre fixa em 100%
-    dataVencimento: '',
+    status: 'ativo' as 'ativo' | 'inativo',
     responsavel: '',
     secretaria: '',
     descricao: '',
@@ -40,15 +37,12 @@ export const CriterioForm = ({ isOpen, onClose, onSubmit, editCriterio }: Criter
     if (isOpen) {
       if (editCriterio) {
         setFormData({
-          nome: editCriterio.nome,
-          status: editCriterio.status,
-          valor: editCriterio.valor,
-          meta: 100, // Meta sempre fixa em 100%
-          dataVencimento: editCriterio.dataVencimento,
-          responsavel: editCriterio.responsavel,
-          secretaria: editCriterio.secretaria,
-          descricao: editCriterio.descricao,
-          periodicidade: editCriterio.periodicidade
+          nome: editCriterio.nome || '',
+          status: editCriterio.status || 'ativo',
+          responsavel: editCriterio.responsavel || '',
+          secretaria: editCriterio.secretaria || '',
+          descricao: editCriterio.descricao || '',
+          periodicidade: editCriterio.periodicidade || 'mensal'
         });
         // Buscar responsáveis da secretaria do critério sendo editado
         if (editCriterio.secretaria) {
@@ -58,9 +52,6 @@ export const CriterioForm = ({ isOpen, onClose, onSubmit, editCriterio }: Criter
         setFormData({
           nome: '',
           status: 'ativo',
-          valor: 0,
-          meta: 100,
-          dataVencimento: '',
           responsavel: '',
           secretaria: '',
           descricao: '',
@@ -134,9 +125,7 @@ export const CriterioForm = ({ isOpen, onClose, onSubmit, editCriterio }: Criter
 
   const statusOptions = [
     { value: 'ativo', label: 'Ativo' },
-    { value: 'pendente', label: 'Pendente' },
-    { value: 'inativo', label: 'Inativo' },
-    { value: 'vencido', label: 'Vencido' }
+    { value: 'inativo', label: 'Inativo' }
   ];
 
   const periodicidadeOptions = [
@@ -174,26 +163,8 @@ export const CriterioForm = ({ isOpen, onClose, onSubmit, editCriterio }: Criter
         return;
       }
 
-      if (formData.valor < 0 || formData.valor > 100) {
-        toast.error('O valor atual deve estar entre 0 e 100');
-        return;
-      }
-
-      // Validar data de vencimento
-      if (formData.dataVencimento) {
-        const dataVencimento = new Date(formData.dataVencimento);
-        const hoje = new Date();
-        hoje.setHours(0, 0, 0, 0);
-        
-        if (dataVencimento < hoje) {
-          toast.error('A data de vencimento não pode ser anterior a hoje');
-          return;
-        }
-      }
-
       onSubmit({
         ...formData,
-        meta: 100, // Garantir que a meta seja sempre 100%
         nome: formData.nome.trim(),
         responsavel: formData.responsavel.trim(),
         descricao: formData.descricao.trim()
@@ -225,8 +196,8 @@ export const CriterioForm = ({ isOpen, onClose, onSubmit, editCriterio }: Criter
           </DialogTitle>
           <DialogDescription>
             {editCriterio 
-              ? 'Edite as informações do critério selecionado'
-              : 'Preencha as informações para criar um novo critério'
+              ? 'Edite as informações do critério. Os critérios são templates periódicos que geram tarefas automaticamente.'
+              : 'Preencha as informações para criar um novo critério. Os critérios são templates periódicos que geram tarefas automaticamente.'
             }
           </DialogDescription>
         </DialogHeader>
@@ -307,44 +278,6 @@ export const CriterioForm = ({ isOpen, onClose, onSubmit, editCriterio }: Criter
                   Nenhum usuário cadastrado nesta secretaria
                 </p>
               )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="valor">Valor Atual (%)</Label>
-              <Input
-                id="valor"
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
-                value={formData.valor}
-                onChange={(e) => handleChange('valor', parseFloat(e.target.value) || 0)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="meta">Meta (%)</Label>
-              <Input
-                id="meta"
-                type="number"
-                value={100}
-                disabled
-                className="bg-muted text-muted-foreground cursor-not-allowed"
-              />
-              <p className="text-sm text-muted-foreground">
-                Todas as metas são fixas em 100%
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="dataVencimento">Data de Vencimento</Label>
-              <Input
-                id="dataVencimento"
-                type="date"
-                value={formData.dataVencimento}
-                onChange={(e) => handleChange('dataVencimento', e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
-              />
             </div>
 
             <div className="space-y-2">

@@ -15,6 +15,7 @@ import { CriteriosList } from "./components/CriteriosList";
 import { AdvancedAlertsPanel } from "./components/AdvancedAlertsPanel";
 import { AdminPanel } from "./components/AdminPanel";
 import { AdvancedMetrics } from "./components/AdvancedMetrics";
+import { TarefasList } from "./components/TarefasList";
 import { Toaster } from "./components/ui/sonner";
 import { JardimLogo } from "./components/JardimLogo";
 import { RecoveryNotification } from "./components/RecoveryNotification";
@@ -28,8 +29,9 @@ import {
   mockAlertas,
   mockMetricas,
   mockUsers,
+  mockTarefas,
 } from "./lib/mockData";
-import { Alerta, Criterio, Metricas } from "./types";
+import { Alerta, Criterio, Metricas, Tarefa } from "./types";
 import { isDevelopment } from "./utils/environment";
 import {
   optimizeMemoryUsage,
@@ -65,25 +67,9 @@ function AppContent() {
   const [alertas, setAlertas] = useState<Alerta[]>(
     mockAlertas || [],
   );
-  const [criterios, setCriterios] = useState<Criterio[]>(() => {
-    // Pré-carregar critérios imediatamente
-    return (mockCriterios || []).map((criterio) => ({
-      ...criterio,
-      meta: 100,
-    }));
-  });
-  const [metricas, setMetricas] = useState<Metricas>(
-    mockMetricas || {
-      totalCriterios: 0,
-      ativas: 0,
-      pendentes: 0,
-      vencidas: 0,
-      percentualCumprimento: 0,
-      alertasAtivos: 0,
-      criteriosConcluidos: 0,
-      percentualConclusao: 0,
-    },
-  );
+  const [criterios, setCriterios] = useState<Criterio[]>(mockCriterios || []);
+  const [tarefas, setTarefas] = useState<Tarefa[]>(mockTarefas || []);
+  const [metricas, setMetricas] = useState<Metricas>(mockMetricas);
   const [initialized, setInitialized] = useState(true); // Já inicializado
   const [forceInitialized, setForceInitialized] =
     useState(false);
@@ -96,6 +82,7 @@ function AppContent() {
   // 🔔 SISTEMA DE ALERTAS AUTOMÁTICO - Integrado
   // Processa alertas automaticamente baseado em periodicidade e dias úteis
   const { alertHistory } = useAlertManager(
+    tarefas,
     criterios,
     handleNewAlert,
   );
@@ -107,6 +94,48 @@ function AppContent() {
   }, []);
 
   // Monitoramento de memória completamente desabilitado para evitar timeouts
+
+  // Carregar critérios do backend ao iniciar
+  useEffect(() => {
+    if (initialized && isAuthenticated) {
+      const loadCriterios = async () => {
+        try {
+          const { projectId, publicAnonKey } = await import(
+            "./utils/supabase/info"
+          );
+
+          const response = await fetch(
+            `https://${projectId}.supabase.co/functions/v1/make-server-225e1157/criterios`,
+            {
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${publicAnonKey}`,
+              },
+            }
+          );
+
+          const result = await response.json();
+
+          if (response.ok && result.success && Array.isArray(result.data)) {
+            console.log(`✅ ${result.data.length} critérios carregados do backend`);
+            setCriterios(result.data.map(c => ({ 
+              ...c, 
+              valor: c.valor ?? 0,
+              meta: c.meta ?? 100,
+              dataVencimento: c.dataVencimento || new Date().toISOString()
+            })));
+          } else {
+            console.warn("Usando critérios mock - backend não disponível");
+          }
+        } catch (error) {
+          console.error("Erro ao carregar critérios do backend:", error);
+          console.warn("Usando critérios mock como fallback");
+        }
+      };
+
+      loadCriterios();
+    }
+  }, [initialized, isAuthenticated]);
 
   // Carregar completions do usuário somente quando necessário
   useEffect(() => {
@@ -175,30 +204,125 @@ function AppContent() {
     [user?.role],
   );
 
+  // Carregar alertas do backend e manter sincronizado
+  useEffect(() => {
+    const loadAlertasFromBackend = async () => {
+      try {
+        const { projectId, publicAnonKey } = await import('./utils/supabase/info');
+        const response = await fetch(
+          `https://${projectId}.supabase.co/functions/v1/make-server-225e1157/alertas`,
+          {
+            headers: {
+              'Authorization': `Bearer ${publicAnonKey}`
+            }
+          }
+        );
+
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && Array.isArray(result.data)) {
+            setAlertas(result.data);
+            console.log(`✅ ${result.data.length} alertas carregados do backend`);
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao carregar alertas do backend:', error);
+      }
+    };
+
+    if (isAuthenticated) {
+      // Carregar imediatamente
+      loadAlertasFromBackend();
+      
+      // Sincronizar a cada 5 minutos para manter os alertas atualizados
+      const syncInterval = setInterval(() => {
+        loadAlertasFromBackend();
+      }, 5 * 60 * 1000); // 5 minutos
+      
+      return () => clearInterval(syncInterval);
+    }
+  }, [isAuthenticated]);
+
   // Handlers
   const handleMarkAlertAsRead = useCallback(
-    (alertaId: string) => {
-      setAlertas((prev) =>
-        prev.map((alerta) =>
-          alerta.id === alertaId
-            ? { ...alerta, lido: !alerta.lido }
-            : alerta,
-        ),
-      );
+    async (alertaId: string) => {
+      try {
+        const { projectId, publicAnonKey } = await import('./utils/supabase/info');
+        const response = await fetch(
+          `https://${projectId}.supabase.co/functions/v1/make-server-225e1157/alertas/${alertaId}/toggle-lido`,
+          {
+            method: 'PATCH',
+            headers: {
+              'Authorization': `Bearer ${publicAnonKey}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            setAlertas((prev) =>
+              prev.map((alerta) =>
+                alerta.id === alertaId
+                  ? { ...alerta, lido: result.data.lido }
+                  : alerta,
+              ),
+            );
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao marcar alerta como lido:', error);
+      }
     },
     [],
   );
 
-  const handleMarkAllAlertsAsRead = useCallback(() => {
-    setAlertas((prev) =>
-      prev.map((alerta) => ({ ...alerta, lido: true })),
-    );
+  const handleMarkAllAlertsAsRead = useCallback(async () => {
+    try {
+      const { projectId, publicAnonKey } = await import('./utils/supabase/info');
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-225e1157/alertas/mark-all-read`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${publicAnonKey}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (response.ok) {
+        setAlertas((prev) =>
+          prev.map((alerta) => ({ ...alerta, lido: true })),
+        );
+      }
+    } catch (error) {
+      console.error('Erro ao marcar todos alertas como lidos:', error);
+    }
   }, []);
 
-  const handleDeleteAlert = useCallback((alertaId: string) => {
-    setAlertas((prev) =>
-      prev.filter((alerta) => alerta.id !== alertaId),
-    );
+  const handleDeleteAlert = useCallback(async (alertaId: string) => {
+    try {
+      const { projectId, publicAnonKey } = await import('./utils/supabase/info');
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-225e1157/alertas/${alertaId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${publicAnonKey}`
+          }
+        }
+      );
+
+      if (response.ok) {
+        setAlertas((prev) =>
+          prev.filter((alerta) => alerta.id !== alertaId),
+        );
+      }
+    } catch (error) {
+      console.error('Erro ao deletar alerta:', error);
+    }
   }, []);
 
   const handleArchiveAlert = useCallback(
@@ -316,35 +440,160 @@ function AppContent() {
   );
 
   const handleAddCriterio = useCallback(
-    (criterioData: Omit<Criterio, "id">) => {
-      const newCriterio: Criterio = {
-        ...criterioData,
-        meta: 100,
-        id: Date.now().toString(),
-      };
-      setCriterios((prev) => [...prev, newCriterio]);
+    async (criterioData: Omit<Criterio, "id">) => {
+      try {
+        const { toast } = await import("sonner@2.0.3");
+        toast.loading("Criando critério...", { id: "create-criterio" });
+
+        const { projectId, publicAnonKey } = await import(
+          "./utils/supabase/info"
+        );
+
+        const response = await fetch(
+          `https://${projectId}.supabase.co/functions/v1/make-server-225e1157/criterios`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${publicAnonKey}`,
+            },
+            body: JSON.stringify(criterioData),
+          }
+        );
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || "Erro ao criar critério");
+        }
+
+        // Adicionar ao estado local com valores padrão
+        setCriterios((prev) => [...prev, {
+          ...result.data,
+          valor: result.data.valor ?? 0,
+          meta: result.data.meta ?? 100,
+          dataVencimento: result.data.dataVencimento || new Date().toISOString()
+        }]);
+
+        toast.success("✅ Critério criado com sucesso!", {
+          id: "create-criterio",
+        });
+      } catch (error) {
+        console.error("Erro ao criar critério:", error);
+        const { toast } = await import("sonner@2.0.3");
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Erro ao criar critério",
+          { id: "create-criterio" }
+        );
+      }
     },
     [],
   );
 
   const handleEditCriterio = useCallback(
-    (id: string, criterioData: Omit<Criterio, "id">) => {
-      setCriterios((prev) =>
-        prev.map((criterio) =>
-          criterio.id === id
-            ? { ...criterioData, meta: 100, id }
-            : criterio,
-        ),
-      );
+    async (id: string, criterioData: Omit<Criterio, "id">) => {
+      try {
+        const { toast } = await import("sonner@2.0.3");
+        toast.loading("Atualizando critério...", { id: "edit-criterio" });
+
+        const { projectId, publicAnonKey } = await import(
+          "./utils/supabase/info"
+        );
+
+        const response = await fetch(
+          `https://${projectId}.supabase.co/functions/v1/make-server-225e1157/criterios/${id}`,
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${publicAnonKey}`,
+            },
+            body: JSON.stringify(criterioData),
+          }
+        );
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || "Erro ao atualizar critério");
+        }
+
+        // Atualizar no estado local com valores padrão
+        setCriterios((prev) =>
+          prev.map((criterio) =>
+            criterio.id === id ? {
+              ...result.data,
+              valor: result.data.valor ?? 0,
+              meta: result.data.meta ?? 100,
+              dataVencimento: result.data.dataVencimento || new Date().toISOString()
+            } : criterio
+          )
+        );
+
+        toast.success("✅ Critério atualizado com sucesso!", {
+          id: "edit-criterio",
+        });
+      } catch (error) {
+        console.error("Erro ao atualizar critério:", error);
+        const { toast } = await import("sonner@2.0.3");
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Erro ao atualizar critério",
+          { id: "edit-criterio" }
+        );
+      }
     },
     [],
   );
 
   const handleDeleteCriterio = useCallback(
-    (id: string) => {
-      setCriterios((prev) =>
-        prev.filter((criterio) => criterio.id !== id),
-      );
+    async (id: string) => {
+      try {
+        const { toast } = await import("sonner@2.0.3");
+        toast.loading("Deletando critério...", { id: "delete-criterio" });
+
+        const { projectId, publicAnonKey } = await import(
+          "./utils/supabase/info"
+        );
+
+        const response = await fetch(
+          `https://${projectId}.supabase.co/functions/v1/make-server-225e1157/criterios/${id}`,
+          {
+            method: "DELETE",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${publicAnonKey}`,
+            },
+          }
+        );
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || "Erro ao deletar critério");
+        }
+
+        // Remover do estado local
+        setCriterios((prev) =>
+          prev.filter((criterio) => criterio.id !== id)
+        );
+
+        toast.success("✅ Critério deletado com sucesso!", {
+          id: "delete-criterio",
+        });
+      } catch (error) {
+        console.error("Erro ao deletar critério:", error);
+        const { toast } = await import("sonner@2.0.3");
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Erro ao deletar critério",
+          { id: "delete-criterio" }
+        );
+      }
 
       // Limpar completion de forma otimizada
       if (user?.id) {
@@ -414,6 +663,153 @@ function AppContent() {
       }
     },
     [user?.id],
+  );
+
+  // Handlers para Tarefas
+  const handleConcluirTarefa = useCallback(
+    async (tarefaId: string) => {
+      if (!user?.id) return;
+
+      try {
+        const { toast } = await import("sonner@2.0.3");
+        
+        setTarefas((prev) =>
+          prev.map((tarefa) => {
+            if (tarefa.id === tarefaId) {
+              return {
+                ...tarefa,
+                status: 'concluida' as const,
+                dataConclusao: new Date().toISOString(),
+                concluidaPor: user.id,
+              };
+            }
+            return tarefa;
+          }),
+        );
+
+        toast.success("✅ Tarefa concluída!");
+      } catch (error) {
+        console.error("Erro ao concluir tarefa:", error);
+        const { toast } = await import("sonner@2.0.3");
+        toast.error("Erro ao concluir tarefa");
+      }
+    },
+    [user?.id],
+  );
+
+  const handleReverterConclusao = useCallback(
+    async (tarefaId: string) => {
+      try {
+        const { toast } = await import("sonner@2.0.3");
+        
+        setTarefas((prev) =>
+          prev.map((tarefa) => {
+            if (tarefa.id === tarefaId) {
+              return {
+                ...tarefa,
+                status: 'pendente' as const,
+                dataConclusao: undefined,
+                concluidaPor: undefined,
+              };
+            }
+            return tarefa;
+          }),
+        );
+
+        toast.info("↩️ Conclusão revertida");
+      } catch (error) {
+        console.error("Erro ao reverter conclusão:", error);
+        const { toast } = await import("sonner@2.0.3");
+        toast.error("Erro ao reverter conclusão");
+      }
+    },
+    [],
+  );
+
+  const handleExcluirTarefa = useCallback(
+    async (tarefaId: string) => {
+      if (user?.role !== 'admin') {
+        const { toast } = await import("sonner@2.0.3");
+        toast.error("Apenas administradores podem excluir tarefas");
+        return;
+      }
+
+      try {
+        const { toast } = await import("sonner@2.0.3");
+        
+        setTarefas((prev) => prev.filter((tarefa) => tarefa.id !== tarefaId));
+        
+        toast.success("🗑️ Tarefa excluída com sucesso!");
+      } catch (error) {
+        console.error("Erro ao excluir tarefa:", error);
+        const { toast } = await import("sonner@2.0.3");
+        toast.error("Erro ao excluir tarefa");
+      }
+    },
+    [user?.role],
+  );
+
+  const handleCriarTarefa = useCallback(
+    async (criterioId: string) => {
+      try {
+        const { toast } = await import("sonner@2.0.3");
+        
+        // Buscar o critério para obter informações
+        const criterio = criterios.find(c => c.id === criterioId);
+        if (!criterio) {
+          toast.error("Critério não encontrado");
+          return;
+        }
+
+        // Importar função de cálculo de vencimento
+        const { calcularProximoVencimento } = await import('./utils/periodicidadeUtils');
+        
+        // Buscar tarefas existentes deste critério para calcular próximo vencimento
+        const tarefasExistentes = tarefas.filter(t => t.criterioId === criterio.id);
+        
+        // Determinar data base para cálculo
+        let dataBase = new Date();
+        if (tarefasExistentes.length > 0) {
+          // Se já existem tarefas, calcular baseado na última tarefa
+          const ultimaTarefa = tarefasExistentes.sort((a, b) => 
+            new Date(b.dataVencimento).getTime() - new Date(a.dataVencimento).getTime()
+          )[0];
+          dataBase = new Date(ultimaTarefa.dataVencimento);
+        }
+
+        // Calcular próximo vencimento baseado na periodicidade do critério
+        const proximoVencimento = calcularProximoVencimento(
+          criterio.periodicidade || '30_dias',
+          dataBase
+        );
+
+        // Criar nova tarefa baseada no critério
+        const novaTarefa: Tarefa = {
+          id: `tarefa-${Date.now()}`,
+          criterioId: criterio.id,
+          descricao: `${criterio.nome}`,
+          dataVencimento: proximoVencimento.toISOString(),
+          status: 'pendente',
+          prioridade: 'media',
+          secretaria: criterio.secretaria,
+        };
+
+        setTarefas((prev) => [...prev, novaTarefa]);
+        
+        const { getPeriodicidadeLabel } = await import('./utils/periodicidadeUtils');
+        toast.success(
+          `📋 Nova tarefa criada!`,
+          {
+            description: `Vencimento: ${proximoVencimento.toLocaleDateString('pt-BR')} (${getPeriodicidadeLabel(criterio.periodicidade || '30_dias')})`
+          }
+        );
+      } catch (error) {
+        console.error("Erro ao criar tarefa:", error);
+        const { toast } = await import("sonner@2.0.3");
+        toast.error("Erro ao criar tarefa");
+      }
+    },
+    [criterios, tarefas],
   );
 
   // Cálculos com debounce para evitar recálculos excessivos
@@ -568,10 +964,13 @@ function AppContent() {
           <CriteriosList
             criterios={criterios}
             user={user}
+            tarefas={tarefas}
             onAddCriterio={handleAddCriterio}
             onEditCriterio={handleEditCriterio}
             onDeleteCriterio={handleDeleteCriterio}
-            onToggleCompletion={handleToggleCriterioCompletion}
+            onConcluirTarefa={handleConcluirTarefa}
+            onCriarTarefa={handleCriarTarefa}
+            onExcluirTarefa={handleExcluirTarefa}
           />
         );
 
@@ -641,6 +1040,8 @@ function AppContent() {
               <AdvancedMetrics
                 criterios={criterios}
                 user={user}
+                alertas={alertas}
+                usuarios={mockUsers}
               />
             </div>
           </div>

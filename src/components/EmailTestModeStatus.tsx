@@ -221,7 +221,7 @@ export function EmailTestModeStatus() {
 
         {/* Informações adicionais */}
         <div className="text-xs text-gray-500 border-t pt-3 space-y-1">
-          <p>📧 <strong>Remetente:</strong> Controladoria Jardim &lt;onboarding@resend.dev&gt;</p>
+          <p>📧 <strong>Remetente:</strong> TranspJardim &lt;controleinterno@transpjardim.tech&gt;</p>
           <p>🏛️ <strong>Sistema:</strong> TranspJardim - Controladoria Municipal de Jardim/CE</p>
           
           {testModeInfo.isTestMode && (
