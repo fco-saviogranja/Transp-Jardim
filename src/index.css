@@ -1627,6 +1627,16 @@
     background-color: var(--color-green-50);
   }
 
+  .bg-green-50\/50 {
+    background-color: color-mix(in srgb, oklch(.982 .018 155.826) 50%, transparent);
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .bg-green-50\/50 {
+      background-color: color-mix(in oklab, var(--color-green-50) 50%, transparent);
+    }
+  }
+
   .bg-green-100 {
     background-color: var(--color-green-100);
   }
@@ -1677,6 +1687,10 @@
 
   .bg-orange-50 {
     background-color: var(--color-orange-50);
+  }
+
+  .bg-orange-200 {
+    background-color: var(--color-orange-200);
   }
 
   .bg-orange-500 {
@@ -3084,6 +3098,18 @@
   }
 
   @media (width >= 48rem) {
+    .md\:w-\[180px\] {
+      width: 180px;
+    }
+  }
+
+  @media (width >= 48rem) {
+    .md\:w-\[200px\] {
+      width: 200px;
+    }
+  }
+
+  @media (width >= 48rem) {
     .md\:grid-cols-2 {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
@@ -3187,8 +3213,8 @@
   }
 
   @media (width >= 80rem) {
-    .xl\:grid-cols-6 {
-      grid-template-columns: repeat(6, minmax(0, 1fr));
+    .xl\:grid-cols-5 {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
     }
   }
 

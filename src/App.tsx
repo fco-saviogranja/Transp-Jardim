@@ -16,6 +16,7 @@ import { AdvancedAlertsPanel } from "./components/AdvancedAlertsPanel";
 import { AdminPanel } from "./components/AdminPanel";
 import { AdvancedMetrics } from "./components/AdvancedMetrics";
 import { TarefasList } from "./components/TarefasList";
+import { UserCompletionHistory } from "./components/UserCompletionHistory";
 import { Toaster } from "./components/ui/sonner";
 import { JardimLogo } from "./components/JardimLogo";
 import { RecoveryNotification } from "./components/RecoveryNotification";
@@ -54,6 +55,7 @@ function AppContent() {
         "dashboard",
         "criterios",
         "alertas",
+        "tarefas",
         "admin",
         "relatorios",
       ].includes(savedView || "")
@@ -68,7 +70,20 @@ function AppContent() {
     mockAlertas || [],
   );
   const [criterios, setCriterios] = useState<Criterio[]>(mockCriterios || []);
-  const [tarefas, setTarefas] = useState<Tarefa[]>(mockTarefas || []);
+  const [tarefas, setTarefas] = useState<Tarefa[]>(() => {
+    // Carregar tarefas do localStorage ao inicializar
+    try {
+      const savedTarefas = localStorage.getItem('transpjardim-tarefas');
+      if (savedTarefas) {
+        const parsed = JSON.parse(savedTarefas);
+        console.log(`✅ ${parsed.length} tarefas carregadas do localStorage`);
+        return parsed;
+      }
+    } catch (error) {
+      console.error('Erro ao carregar tarefas do localStorage:', error);
+    }
+    return mockTarefas || [];
+  });
   const [metricas, setMetricas] = useState<Metricas>(mockMetricas);
   const [initialized, setInitialized] = useState(true); // Já inicializado
   const [forceInitialized, setForceInitialized] =
@@ -92,6 +107,18 @@ function AppContent() {
     console.log("✅ TranspJardim pré-carregado e pronto!");
     console.log("🔔 Sistema de alertas automático ativado");
   }, []);
+
+  // Salvar tarefas no localStorage sempre que mudarem
+  useEffect(() => {
+    if (tarefas && tarefas.length >= 0) {
+      try {
+        localStorage.setItem('transpjardim-tarefas', JSON.stringify(tarefas));
+        console.log(`💾 ${tarefas.length} tarefas salvas no localStorage`);
+      } catch (error) {
+        console.error('Erro ao salvar tarefas no localStorage:', error);
+      }
+    }
+  }, [tarefas]);
 
   // Monitoramento de memória completamente desabilitado para evitar timeouts
 
@@ -178,6 +205,7 @@ function AppContent() {
         "dashboard",
         "criterios",
         "alertas",
+        "tarefas",
         "admin",
         "relatorios",
       ];
@@ -778,6 +806,40 @@ function AppContent() {
     [user?.role],
   );
 
+  const handleEditarTarefa = useCallback(
+    async (tarefaId: string, dados: { dataVencimento: string; status: Tarefa['status'] }) => {
+      if (user?.role !== 'admin') {
+        const { toast } = await import("sonner@2.0.3");
+        toast.error("Apenas administradores podem editar tarefas");
+        return;
+      }
+
+      try {
+        const { toast } = await import("sonner@2.0.3");
+        
+        setTarefas((prev) =>
+          prev.map((tarefa) => {
+            if (tarefa.id === tarefaId) {
+              return {
+                ...tarefa,
+                dataVencimento: dados.dataVencimento,
+                status: dados.status,
+              };
+            }
+            return tarefa;
+          }),
+        );
+        
+        toast.success("✅ Tarefa atualizada com sucesso!");
+      } catch (error) {
+        console.error("Erro ao editar tarefa:", error);
+        const { toast } = await import("sonner@2.0.3");
+        toast.error("Erro ao editar tarefa");
+      }
+    },
+    [user?.role],
+  );
+
   const handleCriarTarefa = useCallback(
     async (criterioId: string) => {
       try {
@@ -816,11 +878,13 @@ function AppContent() {
         const novaTarefa: Tarefa = {
           id: `tarefa-${Date.now()}`,
           criterioId: criterio.id,
-          descricao: `${criterio.nome}`,
+          criteriNome: criterio.nome,
+          descricao: criterio.descricao || `${criterio.nome}`,
           dataVencimento: proximoVencimento.toISOString(),
           status: 'pendente',
           prioridade: 'media',
           secretaria: criterio.secretaria,
+          dataCriacao: new Date().toISOString(),
         };
 
         setTarefas((prev) => [...prev, novaTarefa]);
@@ -1020,6 +1084,60 @@ function AppContent() {
               onSendEmailAlert={handleSendEmailAlert}
               criterios={criterios}
             />
+          </div>
+        );
+
+      case "tarefas":
+        return (
+          <div className="space-y-6">
+            <JardimBreadcrumb
+              items={[{ label: "Minhas Tarefas" }]}
+              onHomeClick={() => handleViewChange("dashboard")}
+            />
+
+            <div className="bg-white rounded-lg p-6 shadow-sm border border-[var(--border)]">
+              <div className="flex items-center space-x-3 mb-6">
+                <div className="flex-shrink-0">
+                  <ImageWithFallback
+                    src={logoRedonda}
+                    alt="Prefeitura de Jardim - CE"
+                    className="w-11 h-11 object-contain rounded-full"
+                    style={{
+                      filter:
+                        "drop-shadow(0 2px 4px rgba(74, 124, 89, 0.1)) brightness(1.05) contrast(1.05)",
+                      background: "transparent",
+                    }}
+                  />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-[var(--jardim-green)]">
+                    Minhas Tarefas
+                  </h2>
+                  <p className="text-[var(--jardim-gray)]">
+                    Acompanhe suas tarefas concluídas e pendentes
+                  </p>
+                </div>
+              </div>
+
+              {user && (
+                <div className="space-y-6">
+                  <UserCompletionHistory
+                    criterios={filteredCriterios}
+                    user={user}
+                  />
+
+                  <TarefasList
+                    tarefas={tarefas}
+                    criterios={criterios}
+                    user={user}
+                    onConcluir={handleConcluirTarefa}
+                    onReverter={handleReverterConclusao}
+                    onExcluir={handleExcluirTarefa}
+                    onEditar={handleEditarTarefa}
+                  />
+                </div>
+              )}
+            </div>
           </div>
         );
 

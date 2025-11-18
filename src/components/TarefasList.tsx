@@ -1,24 +1,48 @@
 import { useState, useMemo } from 'react';
-import { Tarefa, User } from '../types';
+import { Tarefa, User, Criterio } from '../types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { CheckCircle2, Circle, Clock, Search, AlertTriangle, Calendar } from 'lucide-react';
+import { CheckCircle2, Circle, Clock, Search, AlertTriangle, Calendar, Edit } from 'lucide-react';
 import { calcularDiasParaVencimento } from '../utils/tarefasManager';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog';
+import { Label } from './ui/label';
 
 interface TarefasListProps {
   tarefas: Tarefa[];
   user: User | null;
-  onConcluirTarefa: (tarefaId: string) => void;
-  onReverterConclusao: (tarefaId: string) => void;
+  criterios?: Criterio[];
+  onConcluir?: (tarefaId: string) => void;
+  onReverter?: (tarefaId: string) => void;
+  onExcluir?: (tarefaId: string) => void;
+  onEditar?: (tarefaId: string, dados: { dataVencimento: string; status: Tarefa['status'] }) => void;
+  onConcluirTarefa?: (tarefaId: string) => void;
+  onReverterConclusao?: (tarefaId: string) => void;
 }
 
-export const TarefasList = ({ tarefas, user, onConcluirTarefa, onReverterConclusao }: TarefasListProps) => {
+export const TarefasList = ({ tarefas, user, criterios, onConcluir, onReverter, onExcluir, onEditar, onConcluirTarefa, onReverterConclusao }: TarefasListProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pendente' | 'concluida' | 'vencida'>('all');
   const [secretariaFilter, setSecretariaFilter] = useState<string>('all');
+  const [tarefaEditando, setTarefaEditando] = useState<Tarefa | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDataVencimento, setEditDataVencimento] = useState('');
+  const [editStatus, setEditStatus] = useState<Tarefa['status']>('pendente');
+
+  // Normalizar props para compatibilidade com diferentes usos do componente
+  const handleConcluir = onConcluir || onConcluirTarefa;
+  const handleReverter = onReverter || onReverterConclusao;
+  const handleExcluir = onExcluir;
+  const handleEditar = onEditar;
 
   // Filtrar tarefas
   const tarefasFiltradas = useMemo(() => {
@@ -111,6 +135,24 @@ export const TarefasList = ({ tarefas, user, onConcluirTarefa, onReverterConclus
     } else {
       return <span className="text-muted-foreground text-sm">Vence em {dias} dias</span>;
     }
+  };
+
+  const handleEditTarefa = (tarefa: Tarefa) => {
+    setTarefaEditando(tarefa);
+    // Converter ISO string para formato yyyy-MM-dd
+    const dataFormatada = tarefa.dataVencimento.split('T')[0];
+    setEditDataVencimento(dataFormatada);
+    setEditStatus(tarefa.status);
+    setDialogOpen(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (tarefaEditando && handleEditar) {
+      // Converter a data do formato yyyy-MM-dd para ISO
+      const dataISO = new Date(editDataVencimento + 'T00:00:00').toISOString();
+      handleEditar(tarefaEditando.id, { dataVencimento: dataISO, status: editStatus });
+    }
+    setDialogOpen(false);
   };
 
   return (
@@ -246,7 +288,7 @@ export const TarefasList = ({ tarefas, user, onConcluirTarefa, onReverterConclus
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => onReverterConclusao(tarefa.id)}
+                            onClick={() => handleReverter(tarefa.id)}
                           >
                             Reverter
                           </Button>
@@ -254,11 +296,21 @@ export const TarefasList = ({ tarefas, user, onConcluirTarefa, onReverterConclus
                           <Button
                             variant="default"
                             size="sm"
-                            onClick={() => onConcluirTarefa(tarefa.id)}
+                            onClick={() => handleConcluir(tarefa.id)}
                             className="bg-green-600 hover:bg-green-700"
                           >
                             <CheckCircle2 className="w-4 h-4 mr-1" />
                             Concluir
+                          </Button>
+                        )}
+                        {user?.role === 'admin' && handleEditar && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditTarefa(tarefa)}
+                            title="Editar tarefa"
+                          >
+                            <Edit className="w-4 h-4" />
                           </Button>
                         )}
                       </div>
@@ -270,6 +322,58 @@ export const TarefasList = ({ tarefas, user, onConcluirTarefa, onReverterConclus
           </div>
         </CardContent>
       </Card>
+
+      {/* Diálogo de Edição */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Tarefa</DialogTitle>
+            <DialogDescription>
+              Atualize os detalhes da tarefa
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex flex-col">
+              <Label>Data de Vencimento</Label>
+              <Input
+                type="date"
+                value={editDataVencimento}
+                onChange={(e) => setEditDataVencimento(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-col">
+              <Label>Status</Label>
+              <Select value={editStatus} onValueChange={setEditStatus}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pendente">Pendente</SelectItem>
+                  <SelectItem value="vencida">Vencida</SelectItem>
+                  <SelectItem value="concluida">Concluída</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDialogOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleSaveEdit}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

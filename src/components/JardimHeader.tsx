@@ -1,4 +1,4 @@
-import { User, Menu, X, Home, FileText, Bell, Settings, BarChart3, Eye, Accessibility, Phone, AlertTriangle, CheckSquare } from 'lucide-react';
+import { User, Menu, X, Home, FileText, Bell, Settings, BarChart3, Info, Phone, AlertTriangle, CheckSquare } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { useState } from 'react';
@@ -25,6 +25,9 @@ export function JardimHeader({ currentView, onViewChange, alertCount = 0 }: Jard
     { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'criterios', label: 'Critérios', icon: FileText },
     { id: 'alertas', label: 'Alertas', icon: Bell, badge: alertCount },
+    ...(user?.role !== 'admin' ? [
+      { id: 'tarefas', label: 'Minhas Tarefas', icon: CheckSquare }
+    ] : []),
     ...(user?.role === 'admin' ? [
       { id: 'relatorios', label: 'Relatórios', icon: BarChart3 },
       { id: 'admin', label: 'Administração', icon: Settings }
@@ -38,18 +41,24 @@ export function JardimHeader({ currentView, onViewChange, alertCount = 0 }: Jard
         <div className="max-w-7xl mx-auto px-4 py-2">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-4 text-xs">
-              <span className="flex items-center space-x-1">
-                <Eye className="h-3 w-3" />
+              <a 
+                href="https://www.jardim.ce.gov.br/acessoainformacao.php" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center space-x-1 hover:underline cursor-pointer"
+              >
+                <Info className="h-3 w-3" />
                 <span>Transparência</span>
-              </span>
-              <span className="flex items-center space-x-1">
-                <Accessibility className="h-3 w-3" />
-                <span>Acessibilidade</span>
-              </span>
-              <span className="flex items-center space-x-1">
+              </a>
+              <a 
+                href="https://www.jardim.ce.gov.br/ouvidoria" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center space-x-1 hover:underline cursor-pointer"
+              >
                 <Phone className="h-3 w-3" />
                 <span>Ouvidoria</span>
-              </span>
+              </a>
             </div>
             <div className="flex items-center space-x-3">
               {/* Indicador de status da conexão */}

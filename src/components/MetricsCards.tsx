@@ -24,13 +24,6 @@ export const MetricsCards = ({ metricas }: MetricsCardsProps) => {
       bgColor: 'bg-blue-50'
     },
     {
-      title: 'Taxa de Conclusão',
-      value: `${metricas.percentualConclusao || 0}%`,
-      icon: metricas.percentualConclusao && metricas.percentualConclusao >= 70 ? TrendingUp : TrendingDown,
-      color: metricas.percentualConclusao && metricas.percentualConclusao >= 70 ? 'text-[var(--jardim-green)]' : 'text-orange-600',
-      bgColor: metricas.percentualConclusao && metricas.percentualConclusao >= 70 ? 'bg-[var(--jardim-green-lighter)]' : 'bg-orange-50'
-    },
-    {
       title: 'Pendentes',
       value: metricas.pendentes,
       icon: Clock,
@@ -54,7 +47,7 @@ export const MetricsCards = ({ metricas }: MetricsCardsProps) => {
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
       {cards.map((card, index) => {
         const Icon = card.icon;
         
@@ -70,14 +63,6 @@ export const MetricsCards = ({ metricas }: MetricsCardsProps) => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{card.value}</div>
-              {card.title === 'Taxa de Conclusão' && (
-                <Badge 
-                  variant={metricas.percentualConclusao && metricas.percentualConclusao >= 70 ? 'default' : 'destructive'}
-                  className="mt-1"
-                >
-                  {metricas.percentualConclusao && metricas.percentualConclusao >= 70 ? 'Excelente' : 'Pode Melhorar'}
-                </Badge>
-              )}
             </CardContent>
           </Card>
         );
