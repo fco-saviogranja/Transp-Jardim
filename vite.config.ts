@@ -53,10 +53,10 @@
         '@': path.resolve(__dirname, './src'),
       },
     },
-    build: {
-      chunkSizeWarningLimit: 1500
-	target: 'esnext',
+    build: {  
+      target: 'esnext',
       outDir: 'build',
+chunkSizeWarningLimit: 1500
     },
     server: {
       port: 3000,
