@@ -2075,13 +2075,46 @@ app.delete('/make-server-225e1157/criterios/:id', async (c) => {
       }, 404);
     }
     
-    // Deletar do KV Store
+    // ✅ CRÍTICO: Deletar todas as tarefas associadas ao critério
+    console.log(`🧹 Limpando tarefas do critério ${id}...`);
+    const todasTarefas = await kv.getByPrefix('tarefa:');
+    let tarefasDeletadas = 0;
+    
+    for (const item of todasTarefas) {
+      const tarefa = item.value;
+      if (tarefa.criterioId === id) {
+        await kv.del(`tarefa:${tarefa.id}`);
+        tarefasDeletadas++;
+        console.log(`  ✓ Tarefa deletada: ${tarefa.id}`);
+      }
+    }
+    
+    // ✅ Deletar todos os alertas associados ao critério
+    console.log(`🧹 Limpando alertas do critério ${id}...`);
+    const todosAlertas = await kv.getByPrefix('alerta:');
+    let alertasDeletados = 0;
+    
+    for (const item of todosAlertas) {
+      const alerta = item.value;
+      if (alerta.criterioId === id) {
+        await kv.del(`alerta:${alerta.id}`);
+        alertasDeletados++;
+        console.log(`  ✓ Alerta deletado: ${alerta.id}`);
+      }
+    }
+    
+    // Deletar o critério do KV Store
     await kv.del(`criterio:${id}`);
     
     console.log(`✅ Critério deletado com sucesso: ${id}`);
+    console.log(`   └─ ${tarefasDeletadas} tarefas removidas`);
+    console.log(`   └─ ${alertasDeletados} alertas removidos`);
+    
     return c.json({ 
       success: true, 
-      message: 'Critério deletado com sucesso'
+      message: 'Critério deletado com sucesso',
+      tarefasDeletadas,
+      alertasDeletados
     });
   } catch (error) {
     console.error('❌ Erro ao deletar critério:', error);
@@ -2179,11 +2212,36 @@ app.post('/make-server-225e1157/alertas', async (c) => {
     const alertaData = await c.req.json();
     console.log('🔔 Criando novo alerta:', alertaData.mensagem);
     
+    // ✅ PROTEÇÃO ANTI-DUPLICAÇÃO NO BACKEND
+    // Verificar se já existe alerta similar nas últimas 24h
+    if (alertaData.tarefaId) {
+      const todosAlertas = await kv.getByPrefix('alerta:');
+      const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
+      
+      const alertaDuplicado = todosAlertas.find(item => {
+        const alerta = item.value;
+        return alerta.tarefaId === alertaData.tarefaId &&
+               alerta.tipo === (alertaData.tipo || 'status') &&
+               new Date(alerta.dataEnvio).getTime() > twentyFourHoursAgo;
+      });
+      
+      if (alertaDuplicado) {
+        console.log(`⚠️ Alerta duplicado detectado para tarefa ${alertaData.tarefaId} - Ignorando`);
+        return c.json({ 
+          success: true, 
+          data: alertaDuplicado.value,
+          message: 'Alerta já existe',
+          duplicate: true
+        });
+      }
+    }
+    
     const id = alertaData.id || `alert-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
     const alerta = {
       id,
       criterioId: alertaData.criterioId,
+      tarefaId: alertaData.tarefaId, // ✅ Adicionar tarefaId
       tipo: alertaData.tipo || 'status',
       mensagem: alertaData.mensagem,
       prioridade: alertaData.prioridade || 'média',
@@ -2373,6 +2431,64 @@ app.post('/make-server-225e1157/alertas/delete-all', async (c) => {
     return c.json({ 
       success: false, 
       error: 'Erro ao deletar todos os alertas',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    }, 500);
+  }
+});
+
+// ✅ LIMPEZA DE TAREFAS ÓRFÃS (tarefas sem critério válido)
+app.post('/make-server-225e1157/tarefas/cleanup-orphans', async (c) => {
+  try {
+    console.log('🧹 Limpando tarefas órfãs (sem critério válido)...');
+    
+    // Buscar todos os critérios válidos
+    const criterios = await kv.getByPrefix('criterio:');
+    const criterioIdsValidos = new Set(criterios.map(item => item.value.id));
+    
+    console.log(`📋 ${criterioIdsValidos.size} critérios válidos encontrados`);
+    
+    // Buscar todas as tarefas
+    const todasTarefas = await kv.getByPrefix('tarefa:');
+    let tarefasOrfas = 0;
+    let alertasOrfaos = 0;
+    
+    for (const item of todasTarefas) {
+      const tarefa = item.value;
+      
+      // Se a tarefa tem um criterioId mas o critério não existe mais
+      if (tarefa.criterioId && !criterioIdsValidos.has(tarefa.criterioId)) {
+        console.log(`  🗑️ Deletando tarefa órfã: ${tarefa.id} (critério ${tarefa.criterioId} não existe)`);
+        await kv.del(`tarefa:${tarefa.id}`);
+        tarefasOrfas++;
+        
+        // Deletar alertas relacionados a essa tarefa
+        const alertas = await kv.getByPrefix('alerta:');
+        for (const alertaItem of alertas) {
+          const alerta = alertaItem.value;
+          if (alerta.tarefaId === tarefa.id) {
+            await kv.del(`alerta:${alerta.id}`);
+            alertasOrfaos++;
+            console.log(`    ✓ Alerta órfão deletado: ${alerta.id}`);
+          }
+        }
+      }
+    }
+    
+    console.log(`✅ Limpeza concluída!`);
+    console.log(`   └─ ${tarefasOrfas} tarefas órfãs removidas`);
+    console.log(`   └─ ${alertasOrfaos} alertas órfãos removidos`);
+    
+    return c.json({ 
+      success: true, 
+      tarefasOrfas,
+      alertasOrfaos,
+      message: `${tarefasOrfas} tarefas e ${alertasOrfaos} alertas órfãos removidos`
+    });
+  } catch (error) {
+    console.error('❌ Erro ao limpar tarefas órfãs:', error);
+    return c.json({ 
+      success: false, 
+      error: 'Erro ao limpar tarefas órfãs',
       details: error instanceof Error ? error.message : 'Erro desconhecido'
     }, 500);
   }

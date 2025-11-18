@@ -97,14 +97,13 @@ export const useAlertManager = (
   const [alertHistory, setAlertHistory] = useState<Alerta[]>([]);
   const [alertsToday, setAlertsToday] = useState(0);
   const [loadedFromBackend, setLoadedFromBackend] = useState(false);
+  const [processedTaskIds, setProcessedTaskIds] = useState<Set<string>>(new Set());
   
   const { isConfigured: emailConfigured } = useEmailStatus();
 
   // Carregar alertas do backend
   useEffect(() => {
     const loadAlertsFromBackend = async () => {
-      if (loadedFromBackend) return;
-      
       try {
         const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-225e1157/alertas`, {
           headers: {
@@ -135,8 +134,16 @@ export const useAlertManager = (
       }
     };
 
+    // ✅ Carregar imediatamente
     loadAlertsFromBackend();
-  }, [loadedFromBackend, config.debugMode]);
+    
+    // ✅ Recarregar a cada 1 minuto para manter UI atualizada (SEM criar novos alertas)
+    const reloadInterval = setInterval(() => {
+      loadAlertsFromBackend();
+    }, 60 * 1000); // 1 minuto
+
+    return () => clearInterval(reloadInterval);
+  }, [config.debugMode]);
 
   // Calcular dias até vencimento
   const calculateDaysUntilDue = (dataVencimento: string): number => {
@@ -226,6 +233,17 @@ export const useAlertManager = (
     if (tarefa.status === 'concluida') {
       return null;
     }
+
+    // ✅ VALIDAÇÃO CRÍTICA: Verificar se o critério relacionado existe
+    if (tarefa.criterioId) {
+      const criterioExiste = criterios.find(c => c.id === tarefa.criterioId);
+      if (!criterioExiste) {
+        if (config.debugMode) {
+          console.warn(`[AlertManager] ⚠️ Ignorando tarefa "${tarefa.descricao}" - Critério ${tarefa.criterioId} não existe mais`);
+        }
+        return null;
+      }
+    }
     
     const daysUntilDue = calculateDaysUntilDue(tarefa.dataVencimento);
     const conditionDays = rule.condition.days || 0;
@@ -251,6 +269,19 @@ export const useAlertManager = (
       return null;
     }
     
+    // ✅ PROTEÇÃO ANTI-DUPLICAÇÃO ROBUSTA
+    // Criar uma chave única para esta tarefa + tipo de alerta + dia
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const alertKey = `${tarefa.id}-${rule.id}-${today}`;
+    
+    // Verificar se já processamos essa combinação tarefa+regra hoje
+    if (processedTaskIds.has(alertKey)) {
+      if (config.debugMode) {
+        console.log(`[AlertManager] ⏭️ Alerta já processado hoje para tarefa "${tarefa.descricao}" (regra: ${rule.name})`);
+      }
+      return null;
+    }
+    
     // Verificar se já existe alerta similar recente (últimas 24h)
     const existingAlert = alertHistory.find(alert => 
       alert.tarefaId === tarefa.id &&
@@ -258,7 +289,12 @@ export const useAlertManager = (
       new Date(alert.dataEnvio).getTime() > Date.now() - (24 * 60 * 60 * 1000)
     );
     
-    if (existingAlert) return null;
+    if (existingAlert) {
+      if (config.debugMode) {
+        console.log(`[AlertManager] ⏭️ Alerta existente encontrado para tarefa "${tarefa.descricao}"`);
+      }
+      return null;
+    }
     
     const message = processTemplate(rule.template, tarefa, { diasRestantes: daysUntilDue });
     
@@ -363,6 +399,11 @@ export const useAlertManager = (
         if (saved) {
           setAlertHistory(prev => [...prev, alert]);
           
+          // ✅ Marcar como processado para evitar duplicação
+          const today = new Date().toISOString().split('T')[0];
+          const alertKey = `${alert.tarefaId}-${rules.find(r => r.priority === alert.prioridade)?.id || 'unknown'}-${today}`;
+          setProcessedTaskIds(prev => new Set(prev).add(alertKey));
+          
           if (onNewAlert) {
             onNewAlert(alert);
           }
@@ -391,36 +432,18 @@ export const useAlertManager = (
 
   // Verificação periódica
   useEffect(() => {
-    if (!config.enabled) return;
+    // ✅ DESATIVAR COMPLETAMENTE O PROCESSAMENTO NO FRONTEND
+    // O frontend agora apenas EXIBE alertas que já foram criados pelo backend
+    // Os alertas devem ser processados APENAS pelo backend via cron job ou rota específica
     
-    if (!tarefas || tarefas.length === 0) {
-      if (config.debugMode) {
-        console.log('[AlertManager] Nenhuma tarefa disponível para processar');
-      }
-      return;
+    if (config.debugMode) {
+      console.log('[AlertManager] ℹ️ Processamento de alertas desativado no frontend');
+      console.log('[AlertManager] ℹ️ Alertas são processados apenas pelo backend');
     }
-
-    const initialTimeout = setTimeout(() => {
-      try {
-        processAlerts();
-      } catch (error) {
-        console.error('[AlertManager] Erro na verificação inicial:', error);
-      }
-    }, 100);
-
-    const interval = setInterval(() => {
-      try {
-        processAlerts();
-      } catch (error) {
-        console.error('[AlertManager] Erro na verificação periódica:', error);
-      }
-    }, config.checkInterval * 60 * 1000);
-
-    return () => {
-      clearTimeout(initialTimeout);
-      clearInterval(interval);
-    };
-  }, [processAlerts, config.checkInterval, config.enabled, tarefas]);
+    
+    // NÃO EXECUTAR processAlerts() aqui
+    return;
+  }, [config.debugMode]);
 
   // Reset contador diário
   useEffect(() => {
@@ -432,8 +455,9 @@ export const useAlertManager = (
     
     const timeout = setTimeout(() => {
       setAlertsToday(0);
+      setProcessedTaskIds(new Set()); // ✅ Limpar tarefas processadas à meia-noite
       if (config.debugMode) {
-        console.log('[AlertManager] Contador diário de alertas resetado');
+        console.log('[AlertManager] Contador diário de alertas e tarefas processadas resetados');
       }
     }, msUntilMidnight);
 

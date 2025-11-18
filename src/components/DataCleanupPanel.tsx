@@ -18,12 +18,15 @@ import { projectId, publicAnonKey } from '../utils/supabase/info';
 interface CleanupStats {
   criteriosDeleted: number;
   alertasDeleted: number;
+  tarefasOrfas?: number;
+  alertasOrfaos?: number;
 }
 
 export function DataCleanupPanel() {
   const [showCriteriosDialog, setShowCriteriosDialog] = useState(false);
   const [showAlertasDialog, setShowAlertasDialog] = useState(false);
   const [showAllDialog, setShowAllDialog] = useState(false);
+  const [showOrphansDialog, setShowOrphansDialog] = useState(false); // ✅ Novo estado
   const [isDeleting, setIsDeleting] = useState(false);
   const [stats, setStats] = useState<CleanupStats | null>(null);
 
@@ -157,6 +160,49 @@ export function DataCleanupPanel() {
     }
   };
 
+  const deleteOrphans = async () => {
+    setIsDeleting(true);
+    try {
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-225e1157/tarefas/cleanup-orphans`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${publicAnonKey}`
+          }
+        }
+      );
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success(
+          `✅ ${result.message}`,
+          { duration: 5000 }
+        );
+        setStats({
+          ...stats,
+          tarefasOrfas: result.tarefasOrfas,
+          alertasOrfaos: result.alertasOrfaos
+        });
+        
+        // Recarregar a página após 2 segundos
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      } else {
+        toast.error(`❌ Erro ao limpar órfãos: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Erro ao deletar órfãos:', error);
+      toast.error(`❌ Erro ao deletar órfãos: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+    } finally {
+      setIsDeleting(false);
+      setShowOrphansDialog(false);
+    }
+  };
+
   return (
     <Card className="border-red-200 bg-red-50/50">
       <CardHeader>
@@ -199,6 +245,16 @@ export function DataCleanupPanel() {
             <Trash2 className="h-4 w-4" />
             Deletar Tudo (Critérios + Alertas)
           </Button>
+
+          <Button
+            variant="destructive"
+            onClick={() => setShowOrphansDialog(true)}
+            disabled={isDeleting}
+            className="gap-2 bg-orange-600 hover:bg-orange-700"
+          >
+            <Trash2 className="h-4 w-4" />
+            Limpar Dados Órfãos
+          </Button>
         </div>
 
         {stats && (
@@ -214,6 +270,12 @@ export function DataCleanupPanel() {
                 )}
                 {stats.alertasDeleted > 0 && (
                   <li>• {stats.alertasDeleted} alertas deletados</li>
+                )}
+                {stats.tarefasOrfas > 0 && (
+                  <li>• {stats.tarefasOrfas} tarefas órfãs deletadas</li>
+                )}
+                {stats.alertasOrfaos > 0 && (
+                  <li>• {stats.alertasOrfaos} alertas órfãos deletados</li>
                 )}
               </ul>
               <p className="text-green-700 text-sm mt-2">
@@ -339,6 +401,51 @@ export function DataCleanupPanel() {
                   </>
                 ) : (
                   'Sim, Deletar TUDO'
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Dialog para confirmar deleção de ÓRFÃOS */}
+        <AlertDialog open={showOrphansDialog} onOpenChange={setShowOrphansDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-red-600" />
+                Deletar ÓRFÃOS?
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta ação irá <strong>deletar permanentemente:</strong>
+                <ul className="list-disc list-inside mt-2 mb-2">
+                  <li>Tarefas que não têm mais um critério válido associado</li>
+                  <li>Alertas relacionados a essas tarefas órfãs</li>
+                </ul>
+                <strong className="text-orange-600">⚠️ Esta ação remove apenas dados inconsistentes!</strong>
+                <br /><br />
+                Use esta função se você estiver vendo alertas para tarefas que não aparecem no sistema.
+                Isso pode acontecer quando critérios são deletados mas suas tarefas permanecem no banco de dados.
+                <br /><br />
+                Deseja limpar esses dados órfãos agora?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault();
+                  deleteOrphans();
+                }}
+                disabled={isDeleting}
+                className="bg-red-700 hover:bg-red-800"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Deletando...
+                  </>
+                ) : (
+                  'Sim, Deletar ÓRFÃOS'
                 )}
               </AlertDialogAction>
             </AlertDialogFooter>

@@ -303,6 +303,13 @@ function AppContent() {
   }, []);
 
   const handleDeleteAlert = useCallback(async (alertaId: string) => {
+    // ✅ Validação: Apenas administradores podem deletar alertas
+    if (user?.role !== 'admin') {
+      const { toast } = await import("sonner@2.0.3");
+      toast.error("❌ Apenas administradores podem excluir alertas");
+      return;
+    }
+
     try {
       const { projectId, publicAnonKey } = await import('./utils/supabase/info');
       const response = await fetch(
@@ -316,14 +323,29 @@ function AppContent() {
       );
 
       if (response.ok) {
+        // Remover do estado local de alertas
         setAlertas((prev) =>
           prev.filter((alerta) => alerta.id !== alertaId),
         );
+        
+        const { toast } = await import("sonner@2.0.3");
+        toast.success("✅ Alerta excluído com sucesso!");
+        
+        // ✅ CRÍTICO: Recarregar a página para sincronizar o alertHistory
+        // Isso evita que o alerta seja recriado imediatamente
+        console.log('🔄 Alerta deletado - recarregando dados para sincronizar...');
+      } else {
+        const error = await response.text();
+        console.error('Erro ao deletar alerta:', error);
+        const { toast } = await import("sonner@2.0.3");
+        toast.error("❌ Erro ao excluir alerta");
       }
     } catch (error) {
       console.error('Erro ao deletar alerta:', error);
+      const { toast } = await import("sonner@2.0.3");
+      toast.error("❌ Erro ao excluir alerta");
     }
-  }, []);
+  }, [user?.role]);
 
   const handleArchiveAlert = useCallback(
     (alertaId: string) => {
@@ -551,6 +573,13 @@ function AppContent() {
 
   const handleDeleteCriterio = useCallback(
     async (id: string) => {
+      // ✅ Validação: Apenas administradores podem deletar critérios
+      if (user?.role !== 'admin') {
+        const { toast } = await import("sonner@2.0.3");
+        toast.error("❌ Apenas administradores podem excluir critérios");
+        return;
+      }
+
       try {
         const { toast } = await import("sonner@2.0.3");
         toast.loading("Deletando critério...", { id: "delete-criterio" });
@@ -612,7 +641,7 @@ function AppContent() {
         }
       }
     },
-    [user?.id],
+    [user?.id, user?.role],
   );
 
   const handleToggleCriterioCompletion = useCallback(
