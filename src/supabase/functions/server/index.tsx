@@ -2079,27 +2079,30 @@ app.delete('/make-server-225e1157/criterios/:id', async (c) => {
     console.log(`🧹 Limpando tarefas do critério ${id}...`);
     const todasTarefas = await kv.getByPrefix('tarefa:');
     let tarefasDeletadas = 0;
+    const tarefasIdsParaDeletar = new Set<string>(); // ✅ Armazenar IDs das tarefas
     
     for (const item of todasTarefas) {
       const tarefa = item.value;
       if (tarefa.criterioId === id) {
+        tarefasIdsParaDeletar.add(tarefa.id); // ✅ Guardar ID antes de deletar
         await kv.del(`tarefa:${tarefa.id}`);
         tarefasDeletadas++;
         console.log(`  ✓ Tarefa deletada: ${tarefa.id}`);
       }
     }
     
-    // ✅ Deletar todos os alertas associados ao critério
-    console.log(`🧹 Limpando alertas do critério ${id}...`);
+    // ✅ CORRIGIDO: Deletar todos os alertas das tarefas que acabamos de deletar
+    console.log(`🧹 Limpando alertas das ${tarefasDeletadas} tarefas deletadas...`);
     const todosAlertas = await kv.getByPrefix('alerta:');
     let alertasDeletados = 0;
     
     for (const item of todosAlertas) {
       const alerta = item.value;
-      if (alerta.criterioId === id) {
+      // ✅ Verificar se o alerta pertence a uma tarefa que foi deletada
+      if (alerta.tarefaId && tarefasIdsParaDeletar.has(alerta.tarefaId)) {
         await kv.del(`alerta:${alerta.id}`);
         alertasDeletados++;
-        console.log(`  ✓ Alerta deletado: ${alerta.id}`);
+        console.log(`  ✓ Alerta deletado: ${alerta.id} (tarefa: ${alerta.tarefaId})`);
       }
     }
     
@@ -2436,6 +2439,28 @@ app.post('/make-server-225e1157/alertas/delete-all', async (c) => {
   }
 });
 
+// ✅ BUSCAR TODAS AS TAREFAS
+app.get('/make-server-225e1157/tarefas', async (c) => {
+  try {
+    const tarefas = await kv.getByPrefix('tarefa:');
+    const tarefasData = tarefas.map(item => item.value);
+    
+    console.log(`📋 ${tarefasData.length} tarefas encontradas`);
+    
+    return c.json({ 
+      success: true, 
+      data: tarefasData
+    });
+  } catch (error) {
+    console.error('❌ Erro ao buscar tarefas:', error);
+    return c.json({ 
+      success: false, 
+      error: 'Erro ao buscar tarefas',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    }, 500);
+  }
+});
+
 // ✅ LIMPEZA DE TAREFAS ÓRFÃS (tarefas sem critério válido)
 app.post('/make-server-225e1157/tarefas/cleanup-orphans', async (c) => {
   try {
@@ -2489,6 +2514,55 @@ app.post('/make-server-225e1157/tarefas/cleanup-orphans', async (c) => {
     return c.json({ 
       success: false, 
       error: 'Erro ao limpar tarefas órfãs',
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
+    }, 500);
+  }
+});
+
+// ✅ LIMPEZA EXCLUSIVA DE ALERTAS ÓRFÃOS (alertas sem tarefa válida)
+app.post('/make-server-225e1157/alertas/cleanup-orphans', async (c) => {
+  try {
+    console.log('🧹 Limpando alertas órfãos (sem tarefa válida)...');
+    
+    // Buscar todas as tarefas válidas
+    const tarefas = await kv.getByPrefix('tarefa:');
+    const tarefaIdsValidos = new Set(tarefas.map(item => item.value.id));
+    
+    console.log(`📋 ${tarefaIdsValidos.size} tarefas válidas encontradas`);
+    
+    // Buscar todos os alertas
+    const todosAlertas = await kv.getByPrefix('alerta:');
+    let alertasOrfaos = 0;
+    
+    for (const item of todosAlertas) {
+      const alerta = item.value;
+      
+      // Se o alerta tem um tarefaId mas a tarefa não existe mais
+      if (alerta.tarefaId && !tarefaIdsValidos.has(alerta.tarefaId)) {
+        console.log(`  🗑️ Deletando alerta órfão: ${alerta.id} (tarefa ${alerta.tarefaId} não existe)`);
+        await kv.del(`alerta:${alerta.id}`);
+        alertasOrfaos++;
+      } else if (!alerta.tarefaId) {
+        // Alerta sem tarefaId é definitivamente órfão
+        console.log(`  🗑️ Deletando alerta sem tarefaId: ${alerta.id}`);
+        await kv.del(`alerta:${alerta.id}`);
+        alertasOrfaos++;
+      }
+    }
+    
+    console.log(`✅ Limpeza de alertas órfãos concluída!`);
+    console.log(`   └─ ${alertasOrfaos} alertas órfãos removidos`);
+    
+    return c.json({ 
+      success: true, 
+      alertasOrfaos,
+      message: `${alertasOrfaos} alertas órfãos removidos`
+    });
+  } catch (error) {
+    console.error('❌ Erro ao limpar alertas órfãos:', error);
+    return c.json({ 
+      success: false, 
+      error: 'Erro ao limpar alertas órfãos',
       details: error instanceof Error ? error.message : 'Erro desconhecido'
     }, 500);
   }
@@ -2678,12 +2752,15 @@ app.all('*', (c) => {
       'PUT /make-server-225e1157/criterios/:id',
       'DELETE /make-server-225e1157/criterios/:id',
       'POST /make-server-225e1157/criterios/delete-all',
+      'GET /make-server-225e1157/tarefas',
+      'POST /make-server-225e1157/tarefas/cleanup-orphans',
       'GET /make-server-225e1157/alertas',
       'POST /make-server-225e1157/alertas',
       'PATCH /make-server-225e1157/alertas/:id/toggle-lido',
       'POST /make-server-225e1157/alertas/mark-all-read',
       'DELETE /make-server-225e1157/alertas/:id',
       'POST /make-server-225e1157/alertas/cleanup',
+      'POST /make-server-225e1157/alertas/cleanup-orphans',
       'POST /make-server-225e1157/alertas/delete-all',
       'POST /make-server-225e1157/alertas/process-automatic',
       'POST /make-server-225e1157/email/send',

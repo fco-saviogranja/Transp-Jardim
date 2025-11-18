@@ -20,6 +20,7 @@ interface CleanupStats {
   alertasDeleted: number;
   tarefasOrfas?: number;
   alertasOrfaos?: number;
+  alertasOrfaosOnly?: number; // ✅ Novo campo
 }
 
 export function DataCleanupPanel() {
@@ -27,6 +28,7 @@ export function DataCleanupPanel() {
   const [showAlertasDialog, setShowAlertasDialog] = useState(false);
   const [showAllDialog, setShowAllDialog] = useState(false);
   const [showOrphansDialog, setShowOrphansDialog] = useState(false); // ✅ Novo estado
+  const [showAlertOrphansDialog, setShowAlertOrphansDialog] = useState(false); // ✅ Novo estado
   const [isDeleting, setIsDeleting] = useState(false);
   const [stats, setStats] = useState<CleanupStats | null>(null);
 
@@ -203,6 +205,48 @@ export function DataCleanupPanel() {
     }
   };
 
+  const deleteAlertOrphans = async () => {
+    setIsDeleting(true);
+    try {
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-225e1157/alertas/cleanup-orphans`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${publicAnonKey}`
+          }
+        }
+      );
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success(
+          `✅ ${result.message}`,
+          { duration: 5000 }
+        );
+        setStats({
+          ...stats,
+          alertasOrfaosOnly: result.alertasOrfaos
+        });
+        
+        // Recarregar a página após 2 segundos
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      } else {
+        toast.error(`❌ Erro ao limpar órfãos de alertas: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Erro ao deletar órfãos de alertas:', error);
+      toast.error(`❌ Erro ao deletar órfãos de alertas: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+    } finally {
+      setIsDeleting(false);
+      setShowAlertOrphansDialog(false);
+    }
+  };
+
   return (
     <Card className="border-red-200 bg-red-50/50">
       <CardHeader>
@@ -255,6 +299,16 @@ export function DataCleanupPanel() {
             <Trash2 className="h-4 w-4" />
             Limpar Dados Órfãos
           </Button>
+
+          <Button
+            variant="destructive"
+            onClick={() => setShowAlertOrphansDialog(true)}
+            disabled={isDeleting}
+            className="gap-2 bg-orange-600 hover:bg-orange-700"
+          >
+            <Trash2 className="h-4 w-4" />
+            Limpar Alertas Órfãos
+          </Button>
         </div>
 
         {stats && (
@@ -276,6 +330,9 @@ export function DataCleanupPanel() {
                 )}
                 {stats.alertasOrfaos > 0 && (
                   <li>• {stats.alertasOrfaos} alertas órfãos deletados</li>
+                )}
+                {stats.alertasOrfaosOnly > 0 && (
+                  <li>• {stats.alertasOrfaosOnly} alertas órfãos deletados</li>
                 )}
               </ul>
               <p className="text-green-700 text-sm mt-2">
@@ -446,6 +503,50 @@ export function DataCleanupPanel() {
                   </>
                 ) : (
                   'Sim, Deletar ÓRFÃOS'
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Dialog para confirmar deleção de ÓRFÃOS de Alertas */}
+        <AlertDialog open={showAlertOrphansDialog} onOpenChange={setShowAlertOrphansDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-red-600" />
+                Deletar ÓRFÃOS de Alertas?
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta ação irá <strong>deletar permanentemente:</strong>
+                <ul className="list-disc list-inside mt-2 mb-2">
+                  <li>Alertas que não têm mais uma tarefa válida associada</li>
+                </ul>
+                <strong className="text-orange-600">⚠️ Esta ação remove apenas dados inconsistentes!</strong>
+                <br /><br />
+                Use esta função se você estiver vendo alertas que não aparecem no sistema.
+                Isso pode acontecer quando tarefas são deletadas mas seus alertas permanecem no banco de dados.
+                <br /><br />
+                Deseja limpar esses alertas órfãos agora?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault();
+                  deleteAlertOrphans();
+                }}
+                disabled={isDeleting}
+                className="bg-red-700 hover:bg-red-800"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Deletando...
+                  </>
+                ) : (
+                  'Sim, Deletar ÓRFÃOS de Alertas'
                 )}
               </AlertDialogAction>
             </AlertDialogFooter>

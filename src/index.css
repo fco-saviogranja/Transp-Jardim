@@ -1577,6 +1577,16 @@
     background-color: var(--color-blue-50);
   }
 
+  .bg-blue-50\/50 {
+    background-color: color-mix(in srgb, oklch(.97 .014 254.604) 50%, transparent);
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .bg-blue-50\/50 {
+      background-color: color-mix(in oklab, var(--color-blue-50) 50%, transparent);
+    }
+  }
+
   .bg-blue-100 {
     background-color: var(--color-blue-100);
   }
@@ -1767,6 +1777,16 @@
 
   .bg-yellow-50 {
     background-color: var(--color-yellow-50);
+  }
+
+  .bg-yellow-50\/50 {
+    background-color: color-mix(in srgb, oklch(.987 .026 102.212) 50%, transparent);
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .bg-yellow-50\/50 {
+      background-color: color-mix(in oklab, var(--color-yellow-50) 50%, transparent);
+    }
   }
 
   .bg-yellow-100 {
@@ -3078,6 +3098,12 @@
   @media (width >= 48rem) {
     .md\:grid-cols-4 {
       grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
+  @media (width >= 48rem) {
+    .md\:grid-cols-5 {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
     }
   }
 

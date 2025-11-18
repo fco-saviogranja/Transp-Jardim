@@ -18,6 +18,7 @@ import { EmailStatusIndicator } from './EmailStatusIndicator';
 import { SimpleEmailTest } from './SimpleEmailTest';
 import { EmailConfigSimple } from './EmailConfigSimple';
 import { DataCleanupPanel } from './DataCleanupPanel';
+import { DiagnosticBanner } from './DiagnosticBanner';
 import { useSupabase } from '../hooks/useSupabase';
 import { JardimLogo } from './JardimLogo';
 import { mockCriterios, mockAlertas } from '../lib/mockData';
@@ -314,6 +315,7 @@ export const AdminPanel = ({ onNavigate }: AdminPanelProps) => {
               Estas ações são <strong>permanentes e irreversíveis</strong>.
             </p>
           </div>
+          <DiagnosticBanner />
           <DataCleanupPanel />
           <div className="flex justify-start">
             <Button 
