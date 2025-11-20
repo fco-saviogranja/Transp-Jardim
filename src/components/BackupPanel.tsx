@@ -36,9 +36,10 @@ interface BackupPanelProps {
   criterios: Criterio[];
   alertas: Alerta[];
   onDataRestore?: (data: any) => void;
+  onRestoreDefaults?: () => void;
 }
 
-export function BackupPanel({ criterios, alertas, onDataRestore }: BackupPanelProps) {
+export function BackupPanel({ criterios, alertas, onDataRestore, onRestoreDefaults }: BackupPanelProps) {
   const {
     backupHistory,
     isCreating,
@@ -322,6 +323,48 @@ export function BackupPanel({ criterios, alertas, onDataRestore }: BackupPanelPr
                   </Button>
                 </label>
               </div>
+
+              {/* Separador */}
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <Separator />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-white px-2 text-muted-foreground">Ou</span>
+                </div>
+              </div>
+
+              {/* Restaurar Dados Padrão */}
+              <Card className="border-blue-200 bg-blue-50/50">
+                <CardContent className="pt-6">
+                  <div className="text-center space-y-4">
+                    <div className="flex justify-center">
+                      <Database className="h-12 w-12 text-blue-500" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold mb-2">Restaurar Dados Padrão do Sistema</h3>
+                      <p className="text-sm text-gray-600 mb-4">
+                        Restaura os dados padrão do TranspJardim, incluindo:
+                      </p>
+                      <ul className="text-sm text-gray-600 text-left inline-block">
+                        <li>• 5 Alertas padrão</li>
+                        <li>• 10 Critérios padrão</li>
+                        <li>• 10 Tarefas padrão</li>
+                      </ul>
+                    </div>
+                    {onRestoreDefaults && (
+                      <Button
+                        variant="outline"
+                        onClick={onRestoreDefaults}
+                        className="border-blue-300 hover:bg-blue-100"
+                      >
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Restaurar Dados Padrão
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
             </CardContent>
           </Card>
         </TabsContent>

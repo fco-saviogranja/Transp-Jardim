@@ -260,19 +260,18 @@ class EmailService {
         try {
           console.log('🧪 Enviando e-mail de teste para:', testEmail);
           
-          // Ajustar e-mail se em modo de teste
-          const adjustedTestEmail = this.adjustEmailForTestMode(testEmail);
-          
+          // NÃO ajustar e-mail - enviar diretamente para o destinatário especificado
+          // Este é um teste de entrega real, não um alerta do sistema
           const result = await this.request('/email/test', {
             method: 'POST',
-            body: JSON.stringify({ testEmail: adjustedTestEmail }),
+            body: JSON.stringify({ testEmail }), // Enviar e-mail original sem redirecionamento
           });
 
           // Se retornou informações de modo de teste, salvar estado
           if (result.testMode && result.authorizedEmail) {
             this.testModeDetected = true;
             this.authorizedTestEmail = result.authorizedEmail;
-            console.log('✅ API Key válida - Sistema em modo de teste:', result);
+            console.log('⚠️ Sistema em modo sandbox Resend - E-mail pode ter sido redirecionado pelo servidor:', result);
           } else {
             console.log('✅ E-mail de teste enviado:', result);
           }

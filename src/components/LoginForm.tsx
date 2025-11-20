@@ -4,6 +4,8 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Alert, AlertDescription } from './ui/alert';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { useAuth } from '../hooks/useAuth';
 import { AutoInitializer } from './AutoInitializer';
 import { JardimLogo } from './JardimLogo';
@@ -16,6 +18,26 @@ export const LoginForm = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
+  
+  // Estado para o modal de cadastro
+  const [showCadastro, setShowCadastro] = useState(false);
+  const [cadastroNome, setCadastroNome] = useState('');
+  const [cadastroEmail, setCadastroEmail] = useState('');
+  const [cadastroSecretaria, setCadastroSecretaria] = useState('');
+  const [cadastroLoading, setCadastroLoading] = useState(false);
+  const [cadastroSuccess, setCadastroSuccess] = useState(false);
+  
+  // Lista de secretarias
+  const secretarias = [
+    'Secretaria de Educação',
+    'Secretaria de Saúde',
+    'Secretaria de Obras e Infraestrutura',
+    'Secretaria de Meio Ambiente',
+    'Secretaria de Habitação e Desenvolvimento Social',
+    'Secretaria de Agricultura e Desenvolvimento Rural',
+    'Secretaria de Administração e Finanças',
+    'Secretaria de Cultura, Esporte e Lazer'
+  ];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,37 +50,81 @@ export const LoginForm = () => {
       
       if (!success) {
         console.log(`❌ Login falhou para: ${username}`);
-        
-        // Verificar se o usuário existe mas a senha está errada
-        const { mockUsers } = await import('../lib/mockData');
-        
-        // Verificar usuários dinâmicos
-        let dynamicUsers: any[] = [];
-        try {
-          const storedDynamicUsers = localStorage.getItem('transpjardim_dynamic_users');
-          if (storedDynamicUsers) {
-            dynamicUsers = JSON.parse(storedDynamicUsers);
-          }
-        } catch (error) {
-          console.warn('Erro ao verificar usuários dinâmicos:', error);
-        }
-        
-        const allUsers = [...mockUsers, ...dynamicUsers];
-        const userExists = allUsers.find(u => u.username === username);
-        
-        if (userExists) {
-          setError(`Senha incorreta para "${username}". Tente "123" ou consulte o administrador.`);
-        } else {
-          setError(`Usuário "${username}" não encontrado. Use uma das credenciais de teste abaixo ou peça para o administrador criar sua conta.`);
-        }
+        setError(`Usuário ou senha incorretos. Se você ainda não tem acesso, clique em "Cadastrar" abaixo.`);
       } else {
         console.log(`✅ Login bem-sucedido para: ${username}`);
       }
     } catch (err) {
       console.error('❌ Erro crítico no login:', err);
-      setError('Erro interno do sistema. Tente uma das credenciais de teste.');
+      setError('Erro interno do sistema. Tente novamente.');
     } finally {
       setLoading(false);
+    }
+  };
+  
+  const handleCadastro = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCadastroLoading(true);
+    
+    try {
+      // Validar campos
+      if (!cadastroNome || !cadastroEmail || !cadastroSecretaria) {
+        const { toast } = await import('sonner@2.0.3');
+        toast.error('Por favor, preencha todos os campos');
+        setCadastroLoading(false);
+        return;
+      }
+      
+      // Validar formato de email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(cadastroEmail)) {
+        const { toast } = await import('sonner@2.0.3');
+        toast.error('Por favor, insira um e-mail válido');
+        setCadastroLoading(false);
+        return;
+      }
+      
+      // Criar solicitação de cadastro
+      const { SolicitacaoCadastro } = await import('../types');
+      const novaSolicitacao = {
+        id: `sol_${Date.now()}`,
+        nome: cadastroNome,
+        email: cadastroEmail,
+        secretaria: cadastroSecretaria,
+        status: 'pendente' as const,
+        dataSolicitacao: new Date().toISOString()
+      };
+      
+      // Salvar no localStorage
+      const solicitacoesExistentes = localStorage.getItem('transpjardim-solicitacoes-cadastro');
+      const solicitacoes = solicitacoesExistentes ? JSON.parse(solicitacoesExistentes) : [];
+      solicitacoes.push(novaSolicitacao);
+      localStorage.setItem('transpjardim-solicitacoes-cadastro', JSON.stringify(solicitacoes));
+      
+      setCadastroSuccess(true);
+      const { toast } = await import('sonner@2.0.3');
+      toast.success('✅ Solicitação enviada com sucesso!', {
+        description: 'Sua solicitação foi enviada para a administração. Você receberá suas credenciais por e-mail em breve.'
+      });
+      
+      // Limpar campos
+      setCadastroNome('');
+      setCadastroEmail('');
+      setCadastroSecretaria('');
+      
+      // Fechar modal após 3 segundos
+      setTimeout(() => {
+        setShowCadastro(false);
+        setCadastroSuccess(false);
+      }, 3000);
+    } catch (error) {
+      console.error('Erro ao enviar cadastro:', error);
+      const { toast } = await import('sonner@2.0.3');
+      toast.error('Erro ao enviar solicitação', {
+        description: 'Por favor, tente novamente ou entre em contato com a administração.'
+      });
+    } finally {
+      setCadastroLoading(false);
     }
   };
 
@@ -134,8 +200,17 @@ export const LoginForm = () => {
 
           <div className="mt-6 text-center space-y-3">
             <p className="text-xs text-[var(--jardim-gray)]">
-              💡 Entre em contato com a administração para obter suas credenciais de acesso
+              Ainda não tem acesso ao sistema?
             </p>
+            
+            <Button 
+              type="button"
+              variant="outline"
+              className="w-full border-[var(--jardim-green)] text-[var(--jardim-green)] hover:bg-[var(--jardim-green-lighter)]"
+              onClick={() => setShowCadastro(true)}
+            >
+              Cadastrar
+            </Button>
             
             {error?.includes('inicialização') && (
               <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
@@ -163,7 +238,7 @@ export const LoginForm = () => {
                         throw new Error('Falha na inicialização');
                       }
                     } catch (err) {
-                      setError('Erro ao inicializar sistema. Use as credenciais de teste.');
+                      setError('Erro ao inicializar sistema.');
                     } finally {
                       setLoading(false);
                     }
@@ -175,23 +250,94 @@ export const LoginForm = () => {
                 </button>
               </div>
             )}
-            
-            <div className="text-xs text-muted-foreground bg-blue-50 p-3 rounded-lg border">
-              <p className="font-medium text-blue-800 mb-1">📋 Credenciais de Teste:</p>
-              <div className="space-y-1 text-blue-700">
-                <p><strong>Admin:</strong> admin / admin</p>
-                <p><strong>Educação:</strong> educacao / 123</p>
-                <p><strong>Saúde:</strong> saude / 123</p>
-                <p><strong>Obras:</strong> obras / 123</p>
-                <p><strong>Francisco:</strong> franciscosavio / 123</p>
-                <p className="text-xs text-blue-600 mt-2">
-                  ℹ️ Sistema funciona online e offline
-                </p>
-              </div>
-            </div>
           </div>
         </CardContent>
       </Card>
+      
+      {/* Modal de Cadastro */}
+      <Dialog open={showCadastro} onOpenChange={setShowCadastro}>
+        <DialogTrigger className="hidden">Abrir Modal de Cadastro</DialogTrigger>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Cadastre-se</DialogTitle>
+            <DialogDescription>
+              Preencha os campos abaixo para solicitar acesso ao sistema.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCadastro} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="cadastroNome">Nome Completo</Label>
+              <Input
+                id="cadastroNome"
+                type="text"
+                value={cadastroNome}
+                onChange={(e) => setCadastroNome(e.target.value)}
+                placeholder="Digite seu nome completo"
+                required
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="cadastroEmail">E-mail</Label>
+              <Input
+                id="cadastroEmail"
+                type="email"
+                value={cadastroEmail}
+                onChange={(e) => setCadastroEmail(e.target.value)}
+                placeholder="Digite seu e-mail"
+                required
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="cadastroSecretaria">Secretaria</Label>
+              <Select
+                value={cadastroSecretaria}
+                onValueChange={(value) => setCadastroSecretaria(value)}
+                required
+              >
+                <SelectTrigger id="cadastroSecretaria">
+                  <SelectValue placeholder="Selecione a secretaria">
+                    {cadastroSecretaria}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {secretarias.map(secretaria => (
+                    <SelectItem key={secretaria} value={secretaria}>
+                      {secretaria}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {cadastroSuccess && (
+              <Alert className="bg-green-50 border-green-200">
+                <AlertDescription className="text-green-800">
+                  ✅ Solicitação enviada com sucesso!
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <Button 
+              type="submit" 
+              className="w-full bg-[var(--jardim-green)] hover:bg-[var(--jardim-green-light)] text-white"
+              disabled={cadastroLoading}
+            >
+              {cadastroLoading ? 'Enviando...' : 'Enviar Solicitação'}
+            </Button>
+            
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => setShowCadastro(false)}
+            >
+              Cancelar
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -1,0 +1,13 @@
+{
+  "deployment": {
+    "ignore": [
+      "supabase/**",
+      "**/supabase/**",
+      "edge_functions/**"
+    ],
+    "supabase": {
+      "enabled": false,
+      "deployEdgeFunctions": false
+    }
+  }
+}

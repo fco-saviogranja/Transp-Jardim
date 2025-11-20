@@ -18,6 +18,7 @@ import { AdvancedMetrics } from "./components/AdvancedMetrics";
 import { TarefasList } from "./components/TarefasList";
 import { UserCompletionHistory } from "./components/UserCompletionHistory";
 import { Toaster } from "./components/ui/sonner";
+import { toast } from "./utils/toast";
 import { JardimLogo } from "./components/JardimLogo";
 import { RecoveryNotification } from "./components/RecoveryNotification";
 import { AlertSystemStatus } from "./components/AlertSystemStatus";
@@ -89,6 +90,47 @@ function AppContent() {
   const [forceInitialized, setForceInitialized] =
     useState(false);
 
+  // Função para restaurar dados padrão
+  const restaurarDadosPadrao = useCallback(() => {
+    if (user?.role !== 'admin') {
+      toast.error('Apenas administradores podem restaurar dados padrão');
+      return;
+    }
+    
+    const confirmar = window.confirm(
+      '⚠️ ATENÇÃO: Isso irá restaurar todos os dados para o estado padrão do sistema.\n\n' +
+      'Dados que serão restaurados:\n' +
+      '- Alertas (5 alertas padrão)\n' +
+      '- Critérios (10 critérios padrão)\n' +
+      '- Tarefas (10 tarefas padrão)\n\n' +
+      'Deseja continuar?'
+    );
+    
+    if (confirmar) {
+      try {
+        // Limpar localStorage antes de restaurar
+        localStorage.removeItem('transpjardim-tarefas');
+        
+        // Restaurar alertas
+        setAlertas(mockAlertas);
+        
+        // Restaurar critérios
+        setCriterios(mockCriterios);
+        
+        // Restaurar tarefas
+        setTarefas(mockTarefas);
+        localStorage.setItem('transpjardim-tarefas', JSON.stringify(mockTarefas));
+        
+        toast.success('✅ Dados restaurados com sucesso!');
+        console.log('🔄 Dados restaurados para o estado padrão');
+        console.log('📊 Total de tarefas após restauração:', mockTarefas.length);
+      } catch (error) {
+        console.error('Erro ao restaurar dados:', error);
+        toast.error('Erro ao restaurar dados padrão');
+      }
+    }
+  }, [user]);
+
   // Handlers - Definir antes do useAlertManager
   const handleNewAlert = useCallback((novoAlerta: Alerta) => {
     setAlertas((prev) => [novoAlerta, ...prev]);
@@ -100,6 +142,7 @@ function AppContent() {
     tarefas,
     criterios,
     handleNewAlert,
+    mockUsers // ✅ Passar lista de usuários para buscar emails
   );
 
   // Log de inicialização apenas uma vez
@@ -1064,6 +1107,7 @@ function AppContent() {
             onConcluirTarefa={handleConcluirTarefa}
             onCriarTarefa={handleCriarTarefa}
             onExcluirTarefa={handleExcluirTarefa}
+            onEditarTarefa={handleEditarTarefa}
           />
         );
 
@@ -1143,7 +1187,11 @@ function AppContent() {
 
       case "admin":
         return user?.role === "admin" ? (
-          <AdminPanel onNavigate={handleViewChange} />
+          <AdminPanel 
+            onNavigate={handleViewChange} 
+            onRestoreDefaults={restaurarDadosPadrao}
+            currentUser={user}
+          />
         ) : (
           <div className="text-center py-8">
             <p className="text-muted-foreground">

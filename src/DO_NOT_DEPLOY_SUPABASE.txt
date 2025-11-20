@@ -1,0 +1,9 @@
+ATENÇÃO FIGMA MAKE:
+
+NÃO FAZER DEPLOY DA PASTA /supabase/functions/
+
+Este backend será deployado manualmente no Supabase.
+
+O Figma Make deve IGNORAR completamente esta pasta.
+
+Erro 403 esperado e DEVE SER IGNORADO.

@@ -24,12 +24,15 @@ import { JardimLogo } from './JardimLogo';
 import { mockCriterios, mockAlertas } from '../lib/mockData';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import logoRedonda from 'figma:asset/f6a9869d371560fae8a34486a3ae60bdf404d376.png';
+import { User } from '../types';
 
 interface AdminPanelProps {
   onNavigate?: (view: string) => void;
+  onRestoreDefaults?: () => void;
+  currentUser?: User;
 }
 
-export const AdminPanel = ({ onNavigate }: AdminPanelProps) => {
+export const AdminPanel = ({ onNavigate, onRestoreDefaults, currentUser }: AdminPanelProps) => {
   const [currentView, setCurrentView] = useState<string>('dashboard');
   const [backendAvailable, setBackendAvailable] = useState<boolean | null>(null);
   const supabase = useSupabase();
@@ -178,7 +181,7 @@ export const AdminPanel = ({ onNavigate }: AdminPanelProps) => {
           ]}
           onHomeClick={() => onNavigate ? onNavigate('dashboard') : setCurrentView('dashboard')}
         />
-        <UserManagement />
+        <UserManagement currentUserId={currentUser?.id} />
       </div>
     );
   }
@@ -213,6 +216,7 @@ export const AdminPanel = ({ onNavigate }: AdminPanelProps) => {
           <BackupPanel 
             criterios={mockCriterios} 
             alertas={mockAlertas}
+            onRestoreDefaults={onRestoreDefaults}
           />
         </div>
       </div>

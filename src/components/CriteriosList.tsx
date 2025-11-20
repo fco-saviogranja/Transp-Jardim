@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Download, Search, Filter, Plus, Edit, Trash2, ChevronDown, ChevronRight, CheckCircle2, Clock, CalendarPlus } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
+import { Label } from './ui/label';
 import { JardimBreadcrumb } from './JardimBreadcrumb';
 import { Criterio, User, Tarefa } from '../types';
 import { exportCriteriosToExcel } from '../lib/exportExcel';
@@ -26,6 +28,7 @@ interface CriteriosListProps {
   onConcluirTarefa?: (tarefaId: string) => void; // Adicionar handler
   onCriarTarefa?: (criterioId: string) => void; // Handler para criar nova tarefa
   onExcluirTarefa?: (tarefaId: string) => void; // Handler para excluir tarefa
+  onEditarTarefa?: (tarefaId: string, dados: { dataVencimento: string; status: Tarefa['status'] }) => void; // Handler para editar tarefa
 }
 
 export const CriteriosList = ({ 
@@ -37,7 +40,8 @@ export const CriteriosList = ({
   onDeleteCriterio,
   onConcluirTarefa,
   onCriarTarefa,
-  onExcluirTarefa
+  onExcluirTarefa,
+  onEditarTarefa
 }: CriteriosListProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -46,6 +50,17 @@ export const CriteriosList = ({
   const [showForm, setShowForm] = useState(false);
   const [editingCriterio, setEditingCriterio] = useState<Criterio | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  
+  // Estado para edição de tarefa
+  const [editingTarefa, setEditingTarefa] = useState<Tarefa | null>(null);
+  const [showEditTarefaModal, setShowEditTarefaModal] = useState(false);
+  const [editTarefaData, setEditTarefaData] = useState<{
+    dataVencimento: string;
+    status: Tarefa['status'];
+  }>({
+    dataVencimento: '',
+    status: 'pendente'
+  });
 
   const isAdmin = user?.role === 'admin';
 
@@ -193,6 +208,46 @@ export const CriteriosList = ({
   const handleExcluirTarefa = (tarefaId: string) => {
     if (onExcluirTarefa) {
       onExcluirTarefa(tarefaId);
+    }
+  };
+
+  const handleEditarTarefa = (tarefaId: string, dados: { dataVencimento: string; status: Tarefa['status'] }) => {
+    if (onEditarTarefa) {
+      onEditarTarefa(tarefaId, dados);
+    }
+  };
+
+  const openEditTarefaModal = (tarefa: Tarefa) => {
+    setEditingTarefa(tarefa);
+    
+    // Converter ISO string para formato YYYY-MM-DD para o input type="date"
+    const dataVencimento = tarefa.dataVencimento.split('T')[0];
+    
+    setEditTarefaData({
+      dataVencimento: dataVencimento,
+      status: tarefa.status
+    });
+    setShowEditTarefaModal(true);
+  };
+
+  const closeEditTarefaModal = () => {
+    setShowEditTarefaModal(false);
+    setEditingTarefa(null);
+    setEditTarefaData({
+      dataVencimento: '',
+      status: 'pendente'
+    });
+  };
+
+  const handleSaveEditTarefa = () => {
+    if (editingTarefa) {
+      // Converter para ISO string completo ao salvar
+      const dataVencimentoISO = new Date(editTarefaData.dataVencimento).toISOString();
+      handleEditarTarefa(editingTarefa.id, {
+        dataVencimento: dataVencimentoISO,
+        status: editTarefaData.status
+      });
+      closeEditTarefaModal();
     }
   };
 
@@ -484,6 +539,19 @@ export const CriteriosList = ({
                                               </AlertDialogContent>
                                             </AlertDialog>
                                           )}
+                                          
+                                          {/* Botão Editar - apenas para administradores */}
+                                          {isAdmin && (
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={() => openEditTarefaModal(tarefa)}
+                                              className="h-8 w-8 p-0"
+                                              title="Editar tarefa"
+                                            >
+                                              <Edit className="h-4 w-4" />
+                                            </Button>
+                                          )}
                                         </div>
                                       </TableCell>
                                     </TableRow>
@@ -535,6 +603,60 @@ export const CriteriosList = ({
           onSubmit={editingCriterio ? handleEditCriterio : handleAddCriterio}
           editCriterio={editingCriterio}
         />
+
+        {/* Modal de Edição de Tarefa */}
+        <Dialog open={showEditTarefaModal} onOpenChange={closeEditTarefaModal}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Editar Tarefa</DialogTitle>
+              <DialogDescription>
+                Atualize os detalhes da tarefa.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label htmlFor="dataVencimento">Data de Vencimento</Label>
+                <Input
+                  id="dataVencimento"
+                  type="date"
+                  value={editTarefaData.dataVencimento}
+                  onChange={(e) => setEditTarefaData({ ...editTarefaData, dataVencimento: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="status">Status</Label>
+                <Select
+                  value={editTarefaData.status}
+                  onValueChange={(value) => setEditTarefaData({ ...editTarefaData, status: value as Tarefa['status'] })}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pendente">Pendente</SelectItem>
+                    <SelectItem value="concluida">Concluída</SelectItem>
+                    <SelectItem value="vencida">Vencida</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={closeEditTarefaModal}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                onClick={handleSaveEditTarefa}
+              >
+                Salvar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </Card>
     </div>
   );

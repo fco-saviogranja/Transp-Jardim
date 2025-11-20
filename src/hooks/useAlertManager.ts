@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Alerta, Tarefa, Criterio } from '../types';
+import { Alerta, Tarefa, Criterio, User } from '../types';
 import { toast } from 'sonner@2.0.3';
 import { 
   isDiaUtil, 
@@ -89,7 +89,8 @@ const defaultConfig: AlertManagerConfig = {
 export const useAlertManager = (
   tarefas: Tarefa[], 
   criterios: Criterio[],
-  onNewAlert?: (alerta: Alerta) => void
+  onNewAlert?: (alerta: Alerta) => void,
+  usuarios?: User[]
 ) => {
   const [rules, setRules] = useState<AlertRule[]>(defaultRules);
   const [config, setConfig] = useState<AlertManagerConfig>(defaultConfig);
@@ -354,8 +355,17 @@ export const useAlertManager = (
             if (rule.notifications.email && emailConfigured) {
               const criterio = criterios.find(c => c.id === tarefa.criterioId);
               if (criterio) {
+                // 🎯 BUSCAR EMAIL DO RESPONSÁVEL PELA TAREFA
+                const responsavel = usuarios?.find(u => u.id === tarefa.responsavel);
+                const emailDestino = responsavel?.email || 'controleinterno@transpjardim.tech';
+                const nomeResponsavel = responsavel?.name || tarefa.responsavelNome || 'Responsável';
+                
+                if (config.debugMode) {
+                  console.log(`[AlertManager] 📧 Enviando para: ${emailDestino} (${nomeResponsavel})`);
+                }
+                
                 const emailData = {
-                  to: 'controladoria@transpjardim.tech',
+                  to: emailDestino,
                   subject: emailService.generateEmailSubject(
                     alert.prioridade === 'alta' ? 'urgent' : 'warning',
                     tarefa.descricao
@@ -367,8 +377,8 @@ export const useAlertManager = (
                     secretaria: criterio.secretaria
                   },
                   usuario: {
-                    id: 'system',
-                    name: 'Sistema TranspJardim'
+                    id: responsavel?.id || 'system',
+                    name: nomeResponsavel
                   },
                   dueDate: tarefa.dataVencimento
                 };

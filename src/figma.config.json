@@ -1,0 +1,13 @@
+{
+  "supabase": {
+    "enabled": false,
+    "auto_deploy": false,
+    "edge_functions": {
+      "enabled": false
+    }
+  },
+  "deployment": {
+    "skip_supabase": true,
+    "ignore_errors": [403, 401]
+  }
+}

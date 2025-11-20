@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Plus, Search, Users, Edit, Trash2, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Plus, Search, Users, Edit, Trash2, Eye, EyeOff, AlertCircle, UserPlus, CheckCircle, XCircle, Mail } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -9,10 +9,13 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from './ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Alert, AlertDescription } from './ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { toast } from '../utils/toast';
 import { useSupabase } from '../hooks/useSupabase';
-import { User } from '../types';
+import { User, SolicitacaoCadastro } from '../types';
 import { secretarias, mockUsers } from '../lib/mockData';
+import { SolicitacoesCadastro } from './SolicitacoesCadastro';
+import { emailService } from '../lib/emailService';
 
 interface UserFormData {
   name: string;
@@ -23,7 +26,11 @@ interface UserFormData {
   secretaria?: string;
 }
 
-export const UserManagement = () => {
+interface UserManagementProps {
+  currentUserId?: string;
+}
+
+export const UserManagement = ({ currentUserId }: UserManagementProps = {}) => {
   const [users, setUsers] = useState<User[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -39,16 +46,40 @@ export const UserManagement = () => {
     role: 'padrão',
     secretaria: ''
   });
+  
+  // Estados para solicitações de cadastro
+  const [solicitacoes, setSolicitacoes] = useState<SolicitacaoCadastro[]>([]);
+  const [solicitacaoEditando, setSolicitacaoEditando] = useState<SolicitacaoCadastro | null>(null);
+  const [isAprovarDialogOpen, setIsAprovarDialogOpen] = useState(false);
+  const [usuarioSenha, setUsuarioSenha] = useState('');
+  const [usuarioUsername, setUsuarioUsername] = useState('');
 
   const supabase = useSupabase();
+
+  // Estado para controlar envio de e-mail
+  const [sendingEmailTo, setSendingEmailTo] = useState<string | null>(null);
 
   // Carregar usuários
   const loadUsers = async () => {
     setLoading(true);
     try {
       const response = await supabase.getUsers();
+      
+      // Sempre carregar usuários dinâmicos do localStorage
+      let dynamicUsers: User[] = [];
+      try {
+        const storedDynamicUsers = localStorage.getItem('transpjardim_dynamic_users');
+        if (storedDynamicUsers) {
+          dynamicUsers = JSON.parse(storedDynamicUsers);
+          console.log(`📋 ${dynamicUsers.length} usuários dinâmicos carregados do localStorage`);
+        }
+      } catch (error) {
+        console.warn('Erro ao carregar usuários dinâmicos:', error);
+      }
+      
       if (response.success && response.data) {
-        setUsers(response.data);
+        // Backend disponível - combinar usuários do backend com dinâmicos
+        setUsers([...response.data, ...dynamicUsers]);
         setBackendAvailable(true);
       } else {
         console.error('Erro ao carregar usuários:', response.error);
@@ -57,18 +88,6 @@ export const UserManagement = () => {
         if (response.error?.includes('Failed to fetch') || 
             response.error?.includes('NetworkError')) {
           setBackendAvailable(false);
-          
-          // Carregar usuários dinâmicos criados localmente
-          let dynamicUsers: User[] = [];
-          try {
-            const storedDynamicUsers = localStorage.getItem('transpjardim_dynamic_users');
-            if (storedDynamicUsers) {
-              dynamicUsers = JSON.parse(storedDynamicUsers);
-            }
-          } catch (error) {
-            console.warn('Erro ao carregar usuários dinâmicos:', error);
-          }
-          
           setUsers([...mockUsers, ...dynamicUsers]);
           toast.error('Backend indisponível. Usando dados de demonstração + usuários locais.');
         } else {
@@ -339,6 +358,80 @@ export const UserManagement = () => {
     }
   };
 
+  const handleSendTestEmail = async (user: User) => {
+    if (!user.email) {
+      toast.error('Usuário não possui e-mail cadastrado');
+      return;
+    }
+
+    setSendingEmailTo(user.id);
+    
+    try {
+      console.log(`📧 Tentando enviar e-mail de teste para ${user.name} (${user.email})...`);
+      
+      const result = await emailService.sendTestEmail(user.email);
+      
+      console.log('📧 Resultado do envio:', result);
+      
+      // Verificar diferentes tipos de resposta
+      if (result.success) {
+        // Sucesso completo - e-mail enviado para o destinatário correto
+        if (result.testMode && result.authorizedEmail) {
+          // E-mail foi redirecionado pelo Resend (sandbox mode)
+          toast.warning(`⚠️ E-mail redirecionado (Resend Sandbox)`, {
+            description: `O Resend está em modo sandbox. E-mail enviado para ${result.authorizedEmail} em vez de ${user.email}. Configure o domínio transpjardim.tech no Resend para produção.`,
+            duration: 8000
+          });
+        } else {
+          // E-mail enviado com sucesso para o destinatário correto
+          toast.success(`✅ E-mail de teste enviado para ${user.email}!`, {
+            description: `ID: ${result.emailId || 'N/A'}. Verifique a caixa de entrada.`
+          });
+        }
+      } else {
+        // Erro no envio - identificar tipo específico
+        const errorType = (result as any).errorType || 'unknown';
+        const errorMsg = result.error || result.message || 'Erro desconhecido';
+        const errorDetails = (result as any).details || '';
+        const errorAction = (result as any).action || '';
+        
+        console.error('❌ Erro ao enviar e-mail:', { errorType, errorMsg, errorDetails, errorAction });
+        
+        // Mensagens específicas por tipo de erro
+        if (errorType === 'sandbox-restriction' || errorMsg.includes('sandbox') || errorMsg.includes('Sandbox')) {
+          toast.error(`⚠️ Resend em Modo Sandbox`, {
+            description: `${errorDetails || 'A API Key do Resend só pode enviar e-mails para o e-mail cadastrado na conta.'}\n\n✅ Solução: Adicione e verifique o domínio transpjardim.tech no Resend.\n📖 Veja: GUIA_CONFIGURACAO_DOMINIO_RESEND.md`,
+            duration: 10000
+          });
+        } else if (errorType === 'invalid_api_key' || errorMsg.includes('API Key')) {
+          toast.error(`❌ API Key Inválida`, {
+            description: `${errorDetails || 'A API Key do Resend está incorreta ou expirada.'}\n\n🔧 Solução: Verifique a API Key em resend.com/api-keys e atualize nas Configurações do Sistema.`,
+            duration: 8000
+          });
+        } else if (errorType === 'missing_api_key') {
+          toast.error(`⚙️ API Key Não Configurada`, {
+            description: 'Configure a API Key do Resend nas Configurações do Sistema.',
+            duration: 6000
+          });
+        } else {
+          // Erro genérico
+          toast.error(`❌ Falha ao enviar e-mail de teste`, {
+            description: `${errorMsg}${errorDetails ? `\n\n${errorDetails}` : ''}${errorAction ? `\n\n${errorAction}` : ''}`,
+            duration: 8000
+          });
+        }
+      }
+    } catch (error) {
+      console.error('❌ Exceção ao enviar e-mail de teste:', error);
+      toast.error('❌ Erro ao enviar e-mail de teste', {
+        description: error instanceof Error ? error.message : 'Erro de comunicação com o servidor. Verifique sua conexão.',
+        duration: 6000
+      });
+    } finally {
+      setSendingEmailTo(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -351,7 +444,7 @@ export const UserManagement = () => {
               <div>
                 <CardTitle className="text-[var(--jardim-green)]">Gerenciamento de Usuários</CardTitle>
                 <CardDescription>
-                  Gerencie usuários do sistema TranspJardim
+                  Gerencie usuários e solicitações de cadastro do TranspJardim
                 </CardDescription>
               </div>
             </div>
@@ -512,122 +605,153 @@ export const UserManagement = () => {
         </CardHeader>
 
         <CardContent>
-          <div className="space-y-4">
-            {/* Aviso sobre modo demonstração */}
-            {!backendAvailable && (
-              <Alert className="border-amber-200 bg-amber-50">
-                <AlertCircle className="h-4 w-4 text-amber-600" />
-                <AlertDescription className="text-amber-800">
-                  <strong>Modo Demonstração:</strong> O backend não está disponível. 
-                  As alterações são temporárias e serão perdidas ao recarregar a página.
-                </AlertDescription>
-              </Alert>
-            )}
+          <Tabs defaultValue="usuarios" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="usuarios">
+                <Users className="h-4 w-4 mr-2" />
+                Usuários
+              </TabsTrigger>
+              <TabsTrigger value="solicitacoes">
+                <UserPlus className="h-4 w-4 mr-2" />
+                Solicitações de Cadastro
+              </TabsTrigger>
+            </TabsList>
 
-            {/* Barra de pesquisa */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="Buscar por nome, usuário, e-mail ou secretaria..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+            <TabsContent value="usuarios" className="space-y-4 mt-6">
+              <div className="space-y-4">
+                {/* Aviso sobre modo demonstração */}
+                {!backendAvailable && (
+                  <Alert className="border-amber-200 bg-amber-50">
+                    <AlertCircle className="h-4 w-4 text-amber-600" />
+                    <AlertDescription className="text-amber-800">
+                      <strong>Modo Demonstração:</strong> O backend não está disponível. 
+                      As alterações são temporárias e serão perdidas ao recarregar a página.
+                    </AlertDescription>
+                  </Alert>
+                )}
 
-            {/* Estatísticas */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-blue-50 p-4 rounded-lg border">
-                <div className="text-2xl font-bold text-blue-600">{users.length}</div>
-                <div className="text-sm text-blue-600">Total de Usuários</div>
-              </div>
-              <div className="bg-green-50 p-4 rounded-lg border">
-                <div className="text-2xl font-bold text-green-600">
-                  {users.filter(u => u.role === 'admin').length}
+                {/* Barra de pesquisa */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Input
+                    placeholder="Buscar por nome, usuário, e-mail ou secretaria..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
                 </div>
-                <div className="text-sm text-green-600">Administradores</div>
-              </div>
-              <div className="bg-purple-50 p-4 rounded-lg border">
-                <div className="text-2xl font-bold text-purple-600">
-                  {users.filter(u => u.role === 'padrão').length}
-                </div>
-                <div className="text-sm text-purple-600">Usuários Padrão</div>
-              </div>
-            </div>
 
-            {/* Tabela de usuários */}
-            <div className="border rounded-lg">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>Usuário</TableHead>
-                    <TableHead>E-mail</TableHead>
-                    <TableHead>Nível</TableHead>
-                    <TableHead>Secretaria</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    <TableRow key="loading">
-                      <TableCell colSpan={6} className="text-center py-8">
-                        <div className="flex items-center justify-center space-x-2">
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[var(--jardim-green)]"></div>
-                          <span>Carregando usuários...</span>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ) : filteredUsers.length === 0 ? (
-                    <TableRow key="empty">
-                      <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-                        {searchTerm ? 'Nenhum usuário encontrado' : 'Nenhum usuário cadastrado'}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredUsers.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell className="font-medium">{user.name}</TableCell>
-                        <TableCell className="font-mono text-sm">{user.username}</TableCell>
-                        <TableCell className="text-sm text-blue-600">{user.email}</TableCell>
-                        <TableCell>
-                          <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
-                            {user.role === 'admin' ? 'Administrador' : 'Usuário Padrão'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {user.secretaria ? (
-                            <span className="text-sm">{user.secretaria}</span>
-                          ) : (
-                            <span className="text-sm text-gray-400">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end space-x-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleOpenDialog(user)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDeleteUser(user.id, user.name)}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
+                {/* Estatísticas */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-blue-50 p-4 rounded-lg border">
+                    <div className="text-2xl font-bold text-blue-600">{users.length}</div>
+                    <div className="text-sm text-blue-600">Total de Usuários</div>
+                  </div>
+                  <div className="bg-green-50 p-4 rounded-lg border">
+                    <div className="text-2xl font-bold text-green-600">
+                      {users.filter(u => u.role === 'admin').length}
+                    </div>
+                    <div className="text-sm text-green-600">Administradores</div>
+                  </div>
+                  <div className="bg-purple-50 p-4 rounded-lg border">
+                    <div className="text-2xl font-bold text-purple-600">
+                      {users.filter(u => u.role === 'padrão').length}
+                    </div>
+                    <div className="text-sm text-purple-600">Usuários Padrão</div>
+                  </div>
+                </div>
+
+                {/* Tabela de usuários */}
+                <div className="border rounded-lg">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nome</TableHead>
+                        <TableHead>Usuário</TableHead>
+                        <TableHead>E-mail</TableHead>
+                        <TableHead>Nível</TableHead>
+                        <TableHead>Secretaria</TableHead>
+                        <TableHead className="text-right">Ações</TableHead>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
+                    </TableHeader>
+                    <TableBody>
+                      {loading ? (
+                        <TableRow key="loading">
+                          <TableCell colSpan={6} className="text-center py-8">
+                            <div className="flex items-center justify-center space-x-2">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[var(--jardim-green)]"></div>
+                              <span>Carregando usuários...</span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ) : filteredUsers.length === 0 ? (
+                        <TableRow key="empty">
+                          <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                            {searchTerm ? 'Nenhum usuário encontrado' : 'Nenhum usuário cadastrado'}
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        filteredUsers.map((user) => (
+                          <TableRow key={user.id}>
+                            <TableCell className="font-medium">{user.name}</TableCell>
+                            <TableCell className="font-mono text-sm">{user.username}</TableCell>
+                            <TableCell className="text-sm text-blue-600">{user.email}</TableCell>
+                            <TableCell>
+                              <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
+                                {user.role === 'admin' ? 'Administrador' : 'Usuário Padrão'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {user.secretaria ? (
+                                <span className="text-sm">{user.secretaria}</span>
+                              ) : (
+                                <span className="text-sm text-gray-400">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end space-x-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleOpenDialog(user)}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleDeleteUser(user.id, user.name)}
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleSendTestEmail(user)}
+                                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                  disabled={sendingEmailTo === user.id}
+                                >
+                                  <Mail className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="solicitacoes" className="space-y-4 mt-6">
+              <SolicitacoesCadastro 
+                currentUserId={currentUserId} 
+                onUsuarioCriado={loadUsers}
+              />
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 
