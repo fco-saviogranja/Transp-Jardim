@@ -1,3 +1,6 @@
+import { EmailTestPanel } from './EmailTestPanel';
+import { EmailDiagnostico } from './EmailDiagnostico';
+import { EnvDebugger } from './EnvDebugger';
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
@@ -10,19 +13,17 @@ import { SystemStatus } from './SystemStatus';
 import { BackupPanel } from './BackupPanel';
 import { SystemSettings } from './SystemSettings';
 import { AlertsConfigPanel } from './AlertsConfigPanel';
-import { EmailConfigPanel } from './EmailConfigPanel';
 import { EmailSystemStatus } from './EmailSystemStatus';
 import { AlertsDebugPanel } from './AlertsDebugPanel';
 import { EmailTestButton } from './EmailTestButton';
 import { EmailStatusIndicator } from './EmailStatusIndicator';
 import { SimpleEmailTest } from './SimpleEmailTest';
-import { EmailConfigSimple } from './EmailConfigSimple';
 import { DataCleanupPanel } from './DataCleanupPanel';
 import { DiagnosticBanner } from './DiagnosticBanner';
-import { QuickApiKeySetup } from './QuickApiKeySetup';
+import { EmailConfigInfo } from './EmailConfigInfo';
 import { useSupabase } from '../hooks/useSupabase';
 import { JardimLogo } from './JardimLogo';
-import { mockCriterios, mockAlertas } from '../lib/mockData';
+import { mockCriterios, mockAlertas, mockUsers } from '../lib/mockData';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import logoRedonda from 'figma:asset/f6a9869d371560fae8a34486a3ae60bdf404d376.png';
 import { User } from '../types';
@@ -33,12 +34,16 @@ interface AdminPanelProps {
   currentUser?: User;
 }
 
-export const AdminPanel = ({ onNavigate, onRestoreDefaults, currentUser }: AdminPanelProps) => {
+export function AdminPanel({ onNavigate, onRestoreDefaults, currentUser }: AdminPanelProps) {
   const [currentView, setCurrentView] = useState<string>('dashboard');
   const [backendAvailable, setBackendAvailable] = useState<boolean | null>(null);
+  const [realUsers, setRealUsers] = useState<User[]>([]);
+  const [realCriterios, setRealCriterios] = useState<any[]>([]);
+  const [realAlertas, setRealAlertas] = useState<any[]>([]);
+  const [statsLoading, setStatsLoading] = useState(true);
   const supabase = useSupabase();
 
-  // Verificar status do backend ao carregar
+  // Verificar status do backend e buscar dados reais ao carregar
   useEffect(() => {
     const checkBackend = async () => {
       try {
@@ -49,34 +54,64 @@ export const AdminPanel = ({ onNavigate, onRestoreDefaults, currentUser }: Admin
       }
     };
     
+    const fetchRealData = async () => {
+      try {
+        setStatsLoading(true);
+        
+        // Buscar usuários reais
+        const usersResponse = await supabase.getUsers();
+        if (usersResponse.success && usersResponse.data) {
+          setRealUsers(usersResponse.data);
+        }
+        
+        // Buscar critérios reais
+        const criteriosResponse = await supabase.getCriterios();
+        if (criteriosResponse.success && criteriosResponse.data) {
+          setRealCriterios(criteriosResponse.data);
+        }
+        
+        // Buscar alertas reais
+        const alertasResponse = await supabase.getAlertas();
+        if (alertasResponse.success && alertasResponse.data) {
+          setRealAlertas(alertasResponse.data);
+        }
+      } catch (error) {
+        console.error('[AdminPanel] Erro ao buscar dados:', error);
+      } finally {
+        setStatsLoading(false);
+      }
+    };
+    
     checkBackend();
+    fetchRealData();
   }, []);
 
+  // Calcular estatísticas reais do sistema
   const systemStats = [
     {
       title: 'Usuários Ativos',
-      value: '12',
+      value: statsLoading ? '...' : realUsers.length.toString(),
       icon: Users,
       color: 'text-blue-600',
       bgColor: 'bg-blue-50'
     },
     {
-      title: 'APIs Ativas',
-      value: '8',
+      title: 'Critérios Cadastrados',
+      value: statsLoading ? '...' : realCriterios.filter(c => c.status === 'ativo').length.toString(),
       icon: Database,
       color: 'text-green-600',
       bgColor: 'bg-green-50'
     },
     {
-      title: 'E-mails Enviados',
-      value: '156',
-      icon: Mail,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-50'
+      title: 'Alertas Ativos',
+      value: statsLoading ? '...' : realAlertas.filter(a => !a.lido).length.toString(),
+      icon: Bell,
+      color: 'text-orange-600',
+      bgColor: 'bg-orange-50'
     },
     {
-      title: 'Uptime Sistema',
-      value: '99.8%',
+      title: 'Secretarias',
+      value: statsLoading ? '...' : new Set(realCriterios.map(c => c.secretaria)).size.toString(),
       icon: Activity,
       color: 'text-emerald-600',
       bgColor: 'bg-emerald-50'
@@ -197,6 +232,12 @@ export const AdminPanel = ({ onNavigate, onRestoreDefaults, currentUser }: Admin
           ]}
           onHomeClick={() => onNavigate ? onNavigate('dashboard') : setCurrentView('dashboard')}
         />
+        
+        {/* Status do Sistema */}
+        {backendAvailable !== null && (
+          <SystemStatus backendAvailable={backendAvailable} />
+        )}
+        
         <SystemInitializer />
       </div>
     );
@@ -275,9 +316,14 @@ export const AdminPanel = ({ onNavigate, onRestoreDefaults, currentUser }: Admin
           onHomeClick={() => onNavigate ? onNavigate('dashboard') : setCurrentView('dashboard')}
         />
         
-        {/* Configuração de E-mail */}
+        {/* Informações de Configuração de E-mail */}
         <div className="bg-white rounded-lg p-6 shadow-sm border border-[var(--border)]">
-          <EmailConfigSimple />
+          <EmailConfigInfo />
+        </div>
+        
+        {/* Teste de Email */}
+        <div className="bg-white rounded-lg p-6 shadow-sm border border-[var(--border)]">
+          <SimpleEmailTest />
         </div>
       </div>
     );
@@ -343,31 +389,24 @@ export const AdminPanel = ({ onNavigate, onRestoreDefaults, currentUser }: Admin
       />
       
       <div className="bg-white rounded-lg p-6 shadow-sm border border-[var(--border)]">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-3">
-            <div className="flex-shrink-0">
-              <ImageWithFallback 
-                src={logoRedonda}
-                alt="Prefeitura de Jardim - CE"
-                className="w-11 h-11 object-contain rounded-full"
-                style={{ 
-                  filter: 'drop-shadow(0 2px 4px rgba(74, 124, 89, 0.1)) brightness(1.05) contrast(1.05)',
-                  background: 'transparent'
-                }}
-              />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-[var(--jardim-green)]">Painel Administrativo</h2>
-              <p className="text-[var(--jardim-gray)]">
-                Gerencie usuários, configurações e monitore o sistema
-              </p>
-            </div>
+        <div className="flex items-center space-x-3">
+          <div className="flex-shrink-0">
+            <ImageWithFallback 
+              src={logoRedonda}
+              alt="Prefeitura de Jardim - CE"
+              className="w-11 h-11 object-contain rounded-full"
+              style={{ 
+                filter: 'drop-shadow(0 2px 4px rgba(74, 124, 89, 0.1)) brightness(1.05) contrast(1.05)',
+                background: 'transparent'
+              }}
+            />
           </div>
-          
-          {/* Botão de teste de e-mail */}
-          <EmailTestButton 
-            onShowConfig={() => handleAction('email')}
-          />
+          <div>
+            <h2 className="text-2xl font-bold text-[var(--jardim-green)]">Painel Administrativo</h2>
+            <p className="text-[var(--jardim-gray)]">
+              Gerencie usuários, configurações e monitore o sistema
+            </p>
+          </div>
         </div>
       </div>
 
@@ -394,6 +433,15 @@ export const AdminPanel = ({ onNavigate, onRestoreDefaults, currentUser }: Admin
         })}
       </div>
 
+      {/* Debug de Variáveis de Ambiente */}
+      <EnvDebugger />
+
+      {/* Seção de Testes de E-mail e Diagnóstico */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <EmailTestPanel />
+        <EmailDiagnostico />
+      </div>
+      
       {/* Ações Administrativas */}
       <Card>
         <CardHeader>
@@ -442,17 +490,6 @@ export const AdminPanel = ({ onNavigate, onRestoreDefaults, currentUser }: Admin
           </div>
         </CardContent>
       </Card>
-
-      {/* Teste de Email */}
-      <div className="flex justify-center">
-        <SimpleEmailTest />
-      </div>
-
-      {/* Status do Sistema */}
-      {backendAvailable !== null && (
-        <SystemStatus backendAvailable={backendAvailable} />
-      )}
-
 
     </div>
   );

@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guia Visual - Configurar E-mail TranspJardim</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 20px;
+      color: #333;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      overflow: hidden;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #4a7c59 0%, #6fa37f 100%);
+      color: white;
+      padding: 40px;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 32px;
+      margin-bottom: 10px;
+    }
+
+    .header p {
+      font-size: 18px;
+      opacity: 0.9;
+    }
+
+    .progress-bar {
+      display: flex;
+      justify-content: space-between;
+      padding: 30px 40px;
+      background: #f8f9fa;
+      border-bottom: 2px solid #e9ecef;
+    }
+
+    .progress-step {
+      flex: 1;
+      text-align: center;
+      position: relative;
+      opacity: 0.4;
+      transition: all 0.3s;
+    }
+
+    .progress-step.active {
+      opacity: 1;
+    }
+
+    .progress-step.completed {
+      opacity: 1;
+    }
+
+    .progress-step::before {
+      content: '';
+      display: block;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #ddd;
+      margin: 0 auto 10px;
+      line-height: 40px;
+      color: white;
+      font-weight: bold;
+      transition: all 0.3s;
+    }
+
+    .progress-step.active::before {
+      background: #4a7c59;
+      content: attr(data-step);
+    }
+
+    .progress-step.completed::before {
+      background: #22c55e;
+      content: '✓';
+      font-size: 24px;
+    }
+
+    .content {
+      padding: 40px;
+    }
+
+    .step-content {
+      display: none;
+    }
+
+    .step-content.active {
+      display: block;
+      animation: fadeIn 0.5s;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .step-title {
+      font-size: 28px;
+      color: #4a7c59;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .step-title .emoji {
+      font-size: 36px;
+    }
+
+    .instruction {
+      background: #f8f9fa;
+      padding: 20px;
+      border-radius: 10px;
+      margin: 15px 0;
+      border-left: 4px solid #4a7c59;
+    }
+
+    .instruction h3 {
+      color: #4a7c59;
+      margin-bottom: 10px;
+      font-size: 18px;
+    }
+
+    .instruction p {
+      line-height: 1.6;
+      color: #555;
+    }
+
+    .instruction ol {
+      margin: 15px 0 15px 20px;
+    }
+
+    .instruction li {
+      margin: 8px 0;
+      line-height: 1.6;
+    }
+
+    .highlight {
+      background: #fff3cd;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: bold;
+      color: #856404;
+    }
+
+    .code-box {
+      background: #1e293b;
+      color: #e2e8f0;
+      padding: 20px;
+      border-radius: 8px;
+      margin: 15px 0;
+      font-family: 'Courier New', monospace;
+      position: relative;
+      overflow-x: auto;
+    }
+
+    .code-box::before {
+      content: 'Copiar Código';
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: #4a7c59;
+      color: white;
+      padding: 5px 15px;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .code-box:hover::before {
+      background: #3d6449;
+    }
+
+    .warning {
+      background: #fee2e2;
+      border-left: 4px solid #dc2626;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 15px 0;
+    }
+
+    .warning strong {
+      color: #dc2626;
+    }
+
+    .success {
+      background: #d1fae5;
+      border-left: 4px solid #22c55e;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 15px 0;
+    }
+
+    .success strong {
+      color: #22c55e;
+    }
+
+    .tip {
+      background: #dbeafe;
+      border-left: 4px solid #3b82f6;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 15px 0;
+    }
+
+    .tip strong {
+      color: #3b82f6;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 15px;
+      margin-top: 30px;
+      justify-content: space-between;
+    }
+
+    .btn {
+      padding: 15px 30px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s;
+      flex: 1;
+    }
+
+    .btn-primary {
+      background: #4a7c59;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #3d6449;
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(74, 124, 89, 0.3);
+    }
+
+    .btn-secondary {
+      background: #6b7280;
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background: #4b5563;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .screenshot {
+      border: 3px solid #e5e7eb;
+      border-radius: 8px;
+      margin: 20px 0;
+      padding: 10px;
+      background: #f9fafb;
+    }
+
+    .screenshot img {
+      width: 100%;
+      border-radius: 4px;
+    }
+
+    .screenshot-placeholder {
+      background: #f3f4f6;
+      border: 2px dashed #d1d5db;
+      border-radius: 8px;
+      padding: 60px 20px;
+      text-align: center;
+      color: #6b7280;
+      margin: 20px 0;
+    }
+
+    .link-box {
+      background: #ede9fe;
+      padding: 20px;
+      border-radius: 8px;
+      margin: 15px 0;
+      text-align: center;
+    }
+
+    .link-box a {
+      color: #4a7c59;
+      font-size: 18px;
+      font-weight: bold;
+      text-decoration: none;
+      display: inline-block;
+      padding: 10px 20px;
+      background: white;
+      border-radius: 6px;
+      transition: all 0.3s;
+    }
+
+    .link-box a:hover {
+      transform: scale(1.05);
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+
+    .checklist {
+      background: #f9fafb;
+      padding: 20px;
+      border-radius: 8px;
+      margin: 15px 0;
+    }
+
+    .checklist-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      margin: 5px 0;
+      cursor: pointer;
+      transition: all 0.3s;
+      border-radius: 6px;
+    }
+
+    .checklist-item:hover {
+      background: #e5e7eb;
+    }
+
+    .checklist-item input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+    }
+
+    .checklist-item label {
+      cursor: pointer;
+      flex: 1;
+    }
+
+    .video-container {
+      position: relative;
+      padding-bottom: 56.25%;
+      height: 0;
+      overflow: hidden;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+
+    .video-container iframe {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: 8px;
+    }
+
+    .copy-button {
+      background: #4a7c59;
+      color: white;
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-top: 10px;
+      font-size: 14px;
+      transition: all 0.3s;
+    }
+
+    .copy-button:hover {
+      background: #3d6449;
+    }
+
+    .copy-button.copied {
+      background: #22c55e;
+    }
+
+    .final-celebration {
+      text-align: center;
+      padding: 40px;
+    }
+
+    .final-celebration .emoji-big {
+      font-size: 80px;
+      margin-bottom: 20px;
+      animation: bounce 1s infinite;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-20px); }
+    }
+
+    .final-celebration h2 {
+      color: #4a7c59;
+      font-size: 32px;
+      margin-bottom: 15px;
+    }
+
+    .final-celebration p {
+      font-size: 18px;
+      color: #6b7280;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>🚀 Configurar E-mail TranspJardim</h1>
+      <p>Siga este guia passo a passo para ativar o envio de e-mails</p>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="progress-bar">
+      <div class="progress-step active" data-step="1">
+        <div>Passo 1</div>
+        <small>Criar Função</small>
+      </div>
+      <div class="progress-step" data-step="2">
+        <div>Passo 2</div>
+        <small>Colar Código</small>
+      </div>
+      <div class="progress-step" data-step="3">
+        <div>Passo 3</div>
+        <small>Configurar Senha</small>
+      </div>
+      <div class="progress-step" data-step="✓">
+        <div>Finalizado</div>
+        <small>Testar</small>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+      
+      <!-- PASSO 1 -->
+      <div class="step-content active" id="step1">
+        <div class="step-title">
+          <span class="emoji">1️⃣</span>
+          <span>Criar a Edge Function no Supabase</span>
+        </div>
+
+        <div class="instruction">
+          <h3>📍 Primeiro, acesse o Supabase:</h3>
+          <div class="link-box">
+            <a href="https://supabase.com/dashboard" target="_blank">
+              🌐 Abrir Supabase Dashboard →
+            </a>
+          </div>
+        </div>
+
+        <div class="instruction">
+          <h3>🎯 Siga estes passos:</h3>
+          <ol>
+            <li>No dashboard do Supabase, clique no projeto <span class="highlight">TranspJardim</span></li>
+            <li>No menu lateral esquerdo, procure por <span class="highlight">⚡ Edge Functions</span> (ou apenas "Functions")</li>
+            <li>Clique no botão <span class="highlight">+ New Function</span> (canto superior direito)</li>
+            <li>No campo "Name", digite exatamente: <span class="highlight">email</span></li>
+            <li>Clique no botão <span class="highlight">Create</span></li>
+          </ol>
+        </div>
+
+        <div class="tip">
+          <strong>💡 Dica:</strong> Não encontra "Edge Functions"? Procure apenas por "Functions" no menu lateral. Em alguns painéis, o nome pode estar simplificado.
+        </div>
+
+        <div class="checklist">
+          <h3 style="margin-bottom: 15px;">✅ Checklist do Passo 1:</h3>
+          <div class="checklist-item">
+            <input type="checkbox" id="check1-1">
+            <label for="check1-1">Acessei o dashboard do Supabase</label>
+          </div>
+          <div class="checklist-item">
+            <input type="checkbox" id="check1-2">
+            <label for="check1-2">Selecionei o projeto TranspJardim</label>
+          </div>
+          <div class="checklist-item">
+            <input type="checkbox" id="check1-3">
+            <label for="check1-3">Encontrei o menu "Edge Functions"</label>
+          </div>
+          <div class="checklist-item">
+            <input type="checkbox" id="check1-4">
+            <label for="check1-4">Cliquei em "+ New Function"</label>
+          </div>
+          <div class="checklist-item">
+            <input type="checkbox" id="check1-5">
+            <label for="check1-5">Digitei "email" como nome</label>
+          </div>
+          <div class="checklist-item">
+            <input type="checkbox" id="check1-6">
+            <label for="check1-6">Cliquei em "Create"</label>
+          </div>
+        </div>
+
+        <div class="buttons">
+          <button class="btn btn-secondary" disabled>← Anterior</button>
+          <button class="btn btn-primary" onclick="nextStep()">Próximo Passo →</button>
+        </div>
+      </div>
+
+      <!-- PASSO 2 -->
+      <div class="step-content" id="step2">
+        <div class="step-title">
+          <span class="emoji">2️⃣</span>
+          <span>Colar o Código da Função</span>
+        </div>
+
+        <div class="instruction">
+          <h3>📝 O que fazer agora:</h3>
+          <p>Após criar a função, o Supabase vai abrir um <strong>editor de código</strong>. Você vai substituir todo o conteúdo por nosso código personalizado.</p>
+        </div>
+
+        <div class="instruction">
+          <h3>🎯 Passo a passo:</h3>
+          <ol>
+            <li>No editor que se abriu, <strong>selecione TODO o código</strong> que está lá (Ctrl+A ou Cmd+A)</li>
+            <li>Pressione <strong>Delete</strong> para apagar tudo</li>
+            <li>Clique no botão abaixo para copiar nosso código:</li>
+          </ol>
+          
+          <div style="text-align: center; margin: 20px 0;">
+            <button class="copy-button" onclick="copyCode()" id="copyBtn">
+              📋 Copiar Código Completo
+            </button>
+          </div>
+
+          <ol start="4">
+            <li>Volte para o editor do Supabase e <strong>cole o código</strong> (Ctrl+V ou Cmd+V)</li>
+            <li>Clique no botão <span class="highlight">Deploy</span> no canto superior direito</li>
+            <li>Aguarde até aparecer a mensagem <span class="highlight">"Deployed successfully"</span> ✅</li>
+          </ol>
+        </div>
+
+        <div class="warning">
+          <strong>⚠️ Importante:</strong> Certifique-se de clicar no botão <strong>Deploy</strong>! Sem isso, o código não será salvo.
+        </div>
+
+        <div class="tip">
+          <strong>💡 Dica:</strong> O processo de deploy pode levar de 10 a 30 segundos. Aguarde até ver a confirmação verde.
+        </div>
+
+        <div class="checklist">
+          <h3 style="margin-bottom: 15px;">✅ Checklist do Passo 2:</h3>
+          <div class="checklist-item">
+            <input type="checkbox" id="check2-1">
+            <label for="check2-1">Abriu o editor de código</label>
+          </div>
+          <div class="checklist-item">
+            <input type="checkbox" id="check2-2">
+            <label for="check2-2">Apaguei todo o código existente</label>
+          </div>
+          <div class="checklist-item">
+            <input type="checkbox" id="check2-3">
+            <label for="check2-3">Copiei o novo código</label>
+          </div>
+          <div class="checklist-item">
+            <input type="checkbox" id="check2-4">
+            <label for="check2-4">Colei o código no editor</label>
+          </div>
+          <div class="checklist-item">
+            <input type="checkbox" id="check2-5">
+            <label for="check2-5">Cliquei no botão "Deploy"</label>
+          </div>
+          <div class="checklist-item">
+            <input type="checkbox" id="check2-6">
+            <label for="check2-6">Vi a confirmação "Deployed successfully"</label>
+          </div>
+        </div>
+
+        <div class="buttons">
+          <button class="btn btn-secondary" onclick="prevStep()">← Anterior</button>
+          <button class="btn btn-primary" onclick="nextStep()">Próximo Passo →</button>
+        </div>
+      </div>
+
+      <!-- PASSO 3 -->
+      <div class="step-content" id="step3">
+        <div class="step-title">
+          <span class="emoji">3️⃣</span>
+          <span>Configurar a Senha SMTP</span>
+        </div>
+
+        <div class="instruction">
+          <h3>🔐 Configurar a senha do e-mail:</h3>
+          <p>Agora precisamos informar ao Supabase a senha do e-mail <strong>controleinterno@transpjardim.com</strong> para que ele possa enviar mensagens.</p>
+        </div>
+
+        <div class="instruction">
+          <h3>🎯 Siga estes passos:</h3>
+          <ol>
+            <li>No menu lateral esquerdo, clique no ícone de <span class="highlight">⚙️ Configurações</span> (Settings)</li>
+            <li>Clique em <span class="highlight">Project Settings</span></li>
+            <li>Na lista que aparece, procure por <span class="highlight">Edge Functions</span></li>
+            <li>Role a página para baixo até encontrar a seção <span class="highlight">"Secrets"</span> (ou "Environment Variables")</li>
+            <li>Clique no botão <span class="highlight">+ Add secret</span> ou <span class="highlight">+ New</span></li>
+            <li>Preencha os campos:
+              <ul>
+                <li><strong>Name:</strong> <code>SMTP_PASSWORD</code> (exatamente assim, em maiúsculas)</li>
+                <li><strong>Value:</strong> A senha do e-mail controleinterno@transpjardim.com</li>
+              </ul>
+            </li>
+            <li>Clique em <span class="highlight">Add</span> ou <span class="highlight">Save</span></li>
+          </ol>
+        </div>
+
+        <div class="warning">
+          <strong>⚠️ Atenção:</strong> O nome da variável DEVE ser exatamente <code>SMTP_PASSWORD</code> em letras maiúsculas. Qualquer diferença impedirá o funcionamento.
+        </div>
+
+        <div class="tip">
+          <strong>💡 Segurança:</strong> A senha ficará protegida e não será visível após salvar. Isso é normal e esperado!
+        </div>
+
+        <div class="checklist">
+          <h3 style="margin-bottom: 15px;">✅ Checklist do Passo 3:</h3>
+          <div class="checklist-item">
+            <input type="checkbox" id="check3-1">
+            <label for="check3-1">Acessei Project Settings</label>
+          </div>
+          <div class="checklist-item">
+            <input type="checkbox" id="check3-2">
+            <label for="check3-2">Encontrei a opção "Edge Functions"</label>
+          </div>
+          <div class="checklist-item">
+            <input type="checkbox" id="check3-3">
+            <label for="check3-3">Encontrei a seção "Secrets"</label>
+          </div>
+          <div class="checklist-item">
+            <input type="checkbox" id="check3-4">
+            <label for="check3-4">Cliquei em "Add secret"</label>
+          </div>
+          <div class="checklist-item">
+            <input type="checkbox" id="check3-5">
+            <label for="check3-5">Digitei "SMTP_PASSWORD" no campo Name</label>
+          </div>
+          <div class="checklist-item">
+            <input type="checkbox" id="check3-6">
+            <label for="check3-6">Colei a senha no campo Value</label>
+          </div>
+          <div class="checklist-item">
+            <input type="checkbox" id="check3-7">
+            <label for="check3-7">Salvei a configuração</label>
+          </div>
+        </div>
+
+        <div class="buttons">
+          <button class="btn btn-secondary" onclick="prevStep()">← Anterior</button>
+          <button class="btn btn-primary" onclick="nextStep()">Ver Resultado →</button>
+        </div>
+      </div>
+
+      <!-- PASSO FINAL -->
+      <div class="step-content" id="step4">
+        <div class="final-celebration">
+          <div class="emoji-big">🎉</div>
+          <h2>Parabéns! Configuração Concluída!</h2>
+          <p>O sistema de e-mail do TranspJardim está pronto para funcionar!</p>
+        </div>
+
+        <div class="success">
+          <strong>✅ O que foi configurado:</strong>
+          <ul style="margin: 10px 0 10px 20px;">
+            <li>Edge Function "email" criada no Supabase</li>
+            <li>Código SMTP implementado com Hostinger</li>
+            <li>Senha configurada de forma segura</li>
+            <li>Remetente: controleinterno@transpjardim.com</li>
+          </ul>
+        </div>
+
+        <div class="instruction">
+          <h3>🧪 Testar o Sistema (Recomendado):</h3>
+          <ol>
+            <li>Abra o sistema TranspJardim</li>
+            <li>Faça login como administrador</li>
+            <li>Vá em <span class="highlight">Configurações → E-mail</span></li>
+            <li>Digite seu e-mail pessoal</li>
+            <li>Clique em <span class="highlight">"Enviar E-mail de Teste"</span></li>
+            <li>Verifique sua caixa de entrada (pode levar alguns segundos)</li>
+          </ol>
+        </div>
+
+        <div class="tip">
+          <strong>💡 Próximos Passos:</strong>
+          <ul style="margin: 10px 0 0 20px;">
+            <li>O sistema agora enviará alertas automáticos</li>
+            <li>Notificações de tarefas próximas ao vencimento</li>
+            <li>E-mails serão enviados apenas em dias úteis</li>
+            <li>Todos os e-mails incluem a identidade visual do TranspJardim</li>
+          </ul>
+        </div>
+
+        <div class="instruction">
+          <h3>🆘 Problemas?</h3>
+          <p>Se o teste falhar, verifique:</p>
+          <ol>
+            <li>A senha em <code>Project Settings → Edge Functions → Secrets</code> está correta?</li>
+            <li>A função "email" foi criada com deploy bem-sucedido?</li>
+            <li>Verifique os logs em <code>Edge Functions → email → Logs</code></li>
+          </ol>
+        </div>
+
+        <div class="link-box">
+          <p style="margin-bottom: 15px; color: #6b7280;">Documentação adicional disponível em:</p>
+          <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+            <a href="#" onclick="alert('Arquivo: GUIA_VISUAL_SUPABASE.md'); return false;">
+              📖 Guia Visual Completo
+            </a>
+            <a href="#" onclick="alert('Arquivo: CONFIGURACAO_HOSTINGER_EMAIL.md'); return false;">
+              📚 Documentação Técnica
+            </a>
+          </div>
+        </div>
+
+        <div class="buttons" style="margin-top: 40px;">
+          <button class="btn btn-secondary" onclick="prevStep()">← Anterior</button>
+          <button class="btn btn-primary" onclick="window.print()">🖨️ Imprimir Guia</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Hidden code container for copying -->
+  <textarea id="codeContent" style="position: absolute; left: -9999px;">import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
+import nodemailer from 'npm:nodemailer@6.9.7';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+const SMTP_CONFIG = {
+  host: Deno.env.get('SMTP_HOST') || 'smtp.hostinger.com',
+  port: parseInt(Deno.env.get('SMTP_PORT') || '465'),
+  secure: true,
+  auth: {
+    user: Deno.env.get('SMTP_USER') || 'controleinterno@transpjardim.com',
+    pass: Deno.env.get('SMTP_PASSWORD'),
+  },
+};
+
+const transporter = nodemailer.createTransport(SMTP_CONFIG);
+
+const SENDER_NAME = 'TranspJardim';
+const SENDER_EMAIL = 'controleinterno@transpjardim.com';
+const SENDER_FULL = `${SENDER_NAME} <${SENDER_EMAIL}>`;
+const WEBSITE_URL = 'https://transpjardim.com';
+
+const getEmailTemplate = (content: string, title: string) => `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title}</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: linear-gradient(135deg, #4a7c59 0%, #6fa37f 100%); color: white; padding: 30px 20px; text-align: center; border-radius: 8px 8px 0 0;">
+    <h1 style="margin: 0; font-size: 24px;">🏛️ TranspJardim</h1>
+    <p style="margin: 5px 0 0 0; font-size: 14px; opacity: 0.9;">Controladoria Municipal de Jardim/CE</p>
+  </div>
+  <div style="background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none;">
+    ${content}
+  </div>
+  <div style="background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px; text-align: center; font-size: 12px; color: #6b7280;">
+    <p style="margin: 0 0 8px 0;"><strong>Controladoria Municipal de Jardim/CE</strong></p>
+    <p style="margin: 0 0 8px 0;">📧 ${SENDER_EMAIL}</p>
+    <p style="margin: 0 0 8px 0;">🌐 <a href="${WEBSITE_URL}" style="color: #4a7c59; text-decoration: none;">${WEBSITE_URL}</a></p>
+    <p style="margin: 10px 0 0 0; font-size: 11px; color: #9ca3af;">Este é um e-mail automático. Por favor, não responda.</p>
+  </div>
+</body>
+</html>
+`;
+
+const getAlertEmailContent = (data: {
+  tipo: 'warning' | 'urgent';
+  titulo: string;
+  mensagem: string;
+  criterio: string;
+  secretaria: string;
+  vencimento: string;
+  responsavel: string;
+}) => {
+  const isUrgent = data.tipo === 'urgent';
+  const alertColor = isUrgent ? '#dc2626' : '#f59e0b';
+  const alertBg = isUrgent ? '#fee2e2' : '#fef3c7';
+  const alertIcon = isUrgent ? '🔴' : '🟡';
+  const alertLabel = isUrgent ? 'URGENTE' : 'AVISO';
+
+  return `
+    <div style="background: ${alertBg}; border-left: 4px solid ${alertColor}; padding: 15px; margin-bottom: 20px; border-radius: 4px;">
+      <strong style="color: ${alertColor};">${alertIcon} ${alertLabel}</strong>
+    </div>
+    <h2 style="color: #1f2937; margin-top: 0;">${data.titulo}</h2>
+    <p style="color: #4b5563; font-size: 16px;">${data.mensagem}</p>
+    <div style="background: #f9fafb; padding: 15px; border-radius: 4px; margin: 20px 0;">
+      <p style="margin: 5px 0;"><strong>Critério:</strong> ${data.criterio}</p>
+      <p style="margin: 5px 0;"><strong>Secretaria:</strong> ${data.secretaria}</p>
+      <p style="margin: 5px 0;"><strong>Vencimento:</strong> ${data.vencimento}</p>
+      <p style="margin: 5px 0;"><strong>Responsável:</strong> ${data.responsavel}</p>
+    </div>
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${WEBSITE_URL}" style="background: #4a7c59; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">Acessar Sistema</a>
+    </div>
+  `;
+};
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  try {
+    if (!SMTP_CONFIG.auth.pass) {
+      throw new Error('SMTP_PASSWORD não configurada nas variáveis de ambiente');
+    }
+
+    const url = new URL(req.url);
+    const pathname = url.pathname;
+
+    if (pathname.includes('/test')) {
+      const { testEmail } = await req.json();
+
+      if (!testEmail) {
+        throw new Error('E-mail de teste não fornecido');
+      }
+
+      const content = getAlertEmailContent({
+        tipo: 'warning',
+        titulo: 'Teste de Configuração SMTP',
+        mensagem: 'Este é um e-mail de teste enviado pelo sistema TranspJardim via Hostinger SMTP.',
+        criterio: 'Teste Manual',
+        secretaria: 'Sistema',
+        vencimento: new Date().toLocaleDateString('pt-BR'),
+        responsavel: 'Administrador',
+      });
+
+      const html = getEmailTemplate(content, 'Teste - TranspJardim');
+
+      await transporter.sendMail({
+        from: SENDER_FULL,
+        to: testEmail,
+        subject: '🧪 TESTE: Configuração SMTP - TranspJardim',
+        html,
+        text: 'Teste de configuração SMTP do TranspJardim via Hostinger',
+      });
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'E-mail de teste enviado com sucesso',
+          to: testEmail,
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
+    }
+
+    if (pathname.includes('/send-alert')) {
+      const { to, subject, alertType, criterio, usuario, dueDate } = await req.json();
+
+      if (!to || !subject) {
+        throw new Error('Destinatário e assunto são obrigatórios');
+      }
+
+      const content = getAlertEmailContent({
+        tipo: alertType === 'urgent' ? 'urgent' : 'warning',
+        titulo: criterio.nome,
+        mensagem: `O critério "${criterio.nome}" requer sua atenção.`,
+        criterio: criterio.nome,
+        secretaria: criterio.secretaria,
+        vencimento: new Date(dueDate).toLocaleDateString('pt-BR'),
+        responsavel: usuario.name,
+      });
+
+      const html = getEmailTemplate(content, subject);
+
+      const info = await transporter.sendMail({
+        from: SENDER_FULL,
+        to,
+        subject,
+        html,
+        text: `${criterio.nome} - TranspJardim`,
+      });
+
+      try {
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+        const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+        const supabase = createClient(supabaseUrl, supabaseKey);
+
+        await supabase.from('email_logs').insert({
+          to,
+          subject,
+          alert_type: alertType,
+          criterio_id: criterio.id,
+          usuario_id: usuario.id,
+          message_id: info.messageId,
+          status: 'sent',
+          sent_at: new Date().toISOString(),
+        });
+      } catch (logError) {
+        console.error('Erro ao salvar log:', logError);
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          emailId: info.messageId,
+          message: 'Alerta enviado com sucesso',
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
+    }
+
+    if (pathname.includes('/status')) {
+      await transporter.verify();
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          configured: true,
+          provider: 'Hostinger',
+          host: SMTP_CONFIG.host,
+          port: SMTP_CONFIG.port,
+          secure: SMTP_CONFIG.secure,
+          user: SMTP_CONFIG.auth.user,
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
+    }
+
+    throw new Error(`Rota não encontrada: ${pathname}`);
+
+  } catch (error) {
+    console.error('Erro:', error);
+
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message || 'Erro desconhecido',
+        details: error.stack,
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
+      }
+    );
+  }
+});</textarea>
+
+  <script>
+    let currentStep = 1;
+    const totalSteps = 4;
+
+    function updateProgress() {
+      // Update progress indicators
+      for (let i = 1; i <= totalSteps; i++) {
+        const step = document.querySelector(`.progress-step:nth-child(${i})`);
+        step.classList.remove('active', 'completed');
+        
+        if (i < currentStep) {
+          step.classList.add('completed');
+        } else if (i === currentStep) {
+          step.classList.add('active');
+        }
+      }
+
+      // Update step content visibility
+      document.querySelectorAll('.step-content').forEach((content, index) => {
+        content.classList.remove('active');
+        if (index + 1 === currentStep) {
+          content.classList.add('active');
+        }
+      });
+
+      // Scroll to top
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function nextStep() {
+      if (currentStep < totalSteps) {
+        currentStep++;
+        updateProgress();
+      }
+    }
+
+    function prevStep() {
+      if (currentStep > 1) {
+        currentStep--;
+        updateProgress();
+      }
+    }
+
+    function copyCode() {
+      const codeContent = document.getElementById('codeContent');
+      codeContent.select();
+      document.execCommand('copy');
+      
+      const btn = document.getElementById('copyBtn');
+      btn.textContent = '✅ Código Copiado!';
+      btn.classList.add('copied');
+      
+      setTimeout(() => {
+        btn.textContent = '📋 Copiar Código Completo';
+        btn.classList.remove('copied');
+      }, 3000);
+    }
+
+    // Auto-check checklist items when clicked
+    document.querySelectorAll('.checklist-item').forEach(item => {
+      item.addEventListener('click', function(e) {
+        if (e.target.tagName !== 'INPUT') {
+          const checkbox = this.querySelector('input[type="checkbox"]');
+          checkbox.checked = !checkbox.checked;
+        }
+      });
+    });
+
+    // Initialize
+    updateProgress();
+  </script>
+
+</body>
+</html>

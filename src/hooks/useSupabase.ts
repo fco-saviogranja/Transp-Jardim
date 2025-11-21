@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { Criterio, Alerta } from '../types';
+import { supabaseClient } from './useSupabaseClient';
 
 const API_BASE = `https://${projectId}.supabase.co/functions/v1/make-server-225e1157`;
 
@@ -207,7 +208,8 @@ export const useSupabase = () => {
     name: string;
     username: string;
     password: string;
-    role: 'admin' | 'padrão';
+    email: string;
+    role?: 'admin' | 'padrão';
     secretaria?: string;
   }) => {
     const response = await apiCall('/users', {
@@ -236,6 +238,101 @@ export const useSupabase = () => {
       method: 'DELETE',
     });
     return response;
+  };
+
+  // ============================================
+  // SECRETARIAS (Acesso direto ao Supabase)
+  // ============================================
+
+  const getSecretarias = async () => {
+    try {
+      const { data, error } = await supabaseClient
+        .from('secretarias')
+        .select('*')
+        .order('nome', { ascending: true });
+
+      if (error) {
+        console.error('Erro ao buscar secretarias:', error);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, data };
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Erro desconhecido';
+      console.error('Erro ao buscar secretarias:', errorMsg);
+      return { success: false, error: errorMsg };
+    }
+  };
+
+  const createSecretaria = async (data: {
+    nome: string;
+    sigla?: string;
+    descricao?: string;
+  }) => {
+    try {
+      const { data: newSecretaria, error } = await supabaseClient
+        .from('secretarias')
+        .insert([data])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Erro ao criar secretaria:', error);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, data: newSecretaria };
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Erro desconhecido';
+      console.error('Erro ao criar secretaria:', errorMsg);
+      return { success: false, error: errorMsg };
+    }
+  };
+
+  const updateSecretaria = async (id: string, data: {
+    nome?: string;
+    sigla?: string;
+    descricao?: string;
+  }) => {
+    try {
+      const { data: updatedSecretaria, error } = await supabaseClient
+        .from('secretarias')
+        .update({ ...data, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Erro ao atualizar secretaria:', error);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, data: updatedSecretaria };
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Erro desconhecido';
+      console.error('Erro ao atualizar secretaria:', errorMsg);
+      return { success: false, error: errorMsg };
+    }
+  };
+
+  const deleteSecretaria = async (id: string) => {
+    try {
+      const { error } = await supabaseClient
+        .from('secretarias')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('Erro ao excluir secretaria:', error);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Erro desconhecido';
+      console.error('Erro ao excluir secretaria:', errorMsg);
+      return { success: false, error: errorMsg };
+    }
   };
 
   // ============================================
@@ -333,6 +430,11 @@ export const useSupabase = () => {
     createUser,
     updateUser,
     deleteUser,
+    // Secretarias
+    getSecretarias,
+    createSecretaria,
+    updateSecretaria,
+    deleteSecretaria,
     // Utilitários
     initData,
     healthCheck,

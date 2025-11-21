@@ -14,7 +14,7 @@ import {
   Shield,
   Activity
 } from 'lucide-react';
-import { useEmailDebouncer } from './EmailDebouncer';
+import { useEmailDebouncer } from '../hooks/useEmailDebouncer';
 import { getTestModeInfo } from '../lib/emailService';
 
 export function EmailSystemStatus() {

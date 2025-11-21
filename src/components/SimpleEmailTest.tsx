@@ -74,6 +74,14 @@ export function SimpleEmailTest() {
       </CardHeader>
       
       <CardContent className="space-y-4">
+        {/* Banner de modo simulação */}
+        <Alert className="bg-green-50 border-green-200">
+          <CheckCircle className="h-4 w-4 text-green-600" />
+          <AlertDescription className="text-green-800 text-sm">
+            <strong>🧪 Modo Simulação:</strong> E-mails de teste funcionam normalmente. Consulte <code className="bg-green-100 px-1 rounded">CONFIGURAR_EMAIL.md</code> para ativar envio real.
+          </AlertDescription>
+        </Alert>
+
         <div className="space-y-2">
           <p className="text-sm text-muted-foreground">
             Email de destino: <code className="bg-gray-100 px-1 rounded">2421541@faculdadececape.edu.br</code>

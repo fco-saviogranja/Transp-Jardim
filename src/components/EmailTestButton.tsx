@@ -4,7 +4,7 @@ import { Badge } from './ui/badge';
 import { Mail, Send, CheckCircle, XCircle, AlertTriangle, Clock } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import { useEmailStatus } from '../hooks/useEmailStatusOptimized';
-import { useEmailDebouncer } from './EmailDebouncer';
+import { useEmailDebouncer } from '../hooks/useEmailDebouncer';
 import { sendTestEmail } from '../lib/emailService';
 
 interface EmailTestButtonProps {

@@ -97,13 +97,19 @@ export function JardimHeader({ currentView, onViewChange, alertCount = 0 }: Jard
               <div className="flex items-center">
                 {/* Logo oficial da Prefeitura de Jardim - desktop */}
                 <div className="hidden lg:block">
-                  <div className="jardim-header-logo rounded-lg p-2">
+                  <div 
+                    className="jardim-header-logo rounded-lg p-2 cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => onViewChange('dashboard')}
+                  >
                     <JardimLogo variant="rectangular" className="h-15 w-auto max-w-sm" alt="Prefeitura de Jardim - CE" forceTransparent={true} />
                   </div>
                 </div>
                 
                 {/* Logo + título - mobile e tablet */}
-                <div className="lg:hidden flex items-center">
+                <div 
+                  className="lg:hidden flex items-center cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={() => onViewChange('dashboard')}
+                >
                   <div className="jardim-header-logo rounded-full p-1 mr-3">
                     <ImageWithFallback 
                       src={logoRedonda}

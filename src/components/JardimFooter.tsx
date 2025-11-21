@@ -2,14 +2,21 @@ import { MapPin, Phone, Mail, Clock, Globe } from 'lucide-react';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import logoRedonda from 'figma:asset/f6a9869d371560fae8a34486a3ae60bdf404d376.png';
 
-export function JardimFooter() {
+interface JardimFooterProps {
+  onNavigate?: (view: string) => void;
+}
+
+export function JardimFooter({ onNavigate }: JardimFooterProps) {
   return (
     <footer className="bg-[var(--jardim-green)] text-white mt-auto">
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Informações da Prefeitura */}
           <div>
-            <div className="flex items-center mb-4">
+            <div 
+              className="flex items-center mb-4 cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => onNavigate?.('dashboard')}
+            >
               <div className="mr-4 flex-shrink-0">
                 <ImageWithFallback 
                   src={logoRedonda}
@@ -35,7 +42,7 @@ export function JardimFooter() {
           {/* Contato */}
           <div>
             <h4 className="font-semibold mb-4">Contato</h4>
-            <div className="space-y-3 text-sm">
+            <div className="space-y-2 text-sm">
               <div className="flex items-center space-x-3">
                 <MapPin className="h-4 w-4 opacity-75" />
                 <span className="opacity-90">Rua Central, s/n - Centro, Jardim/CE</span>

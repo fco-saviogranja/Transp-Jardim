@@ -6,7 +6,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { Download, Search, Filter, Plus, Edit, Trash2, ChevronDown, ChevronRight, CheckCircle2, Clock, CalendarPlus } from 'lucide-react';
+import { Download, Search, Filter, Plus, Edit, Trash2, ChevronDown, ChevronRight, CheckCircle2, Clock, CalendarPlus, Building2 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Label } from './ui/label';
@@ -17,6 +17,7 @@ import { CriterioForm } from './CriterioForm';
 import { JardimLogo } from './JardimLogo';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import logoRedonda from 'figma:asset/f6a9869d371560fae8a34486a3ae60bdf404d376.png';
+import { SecretariasManager } from './SecretariasManager';
 
 interface CriteriosListProps {
   criterios: Criterio[];
@@ -46,6 +47,7 @@ export const CriteriosList = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [expandedCriterios, setExpandedCriterios] = useState<Set<string>>(new Set());
+  const [showSecretariasManager, setShowSecretariasManager] = useState(false);
 
   const [showForm, setShowForm] = useState(false);
   const [editingCriterio, setEditingCriterio] = useState<Criterio | null>(null);
@@ -251,6 +253,11 @@ export const CriteriosList = ({
     }
   };
 
+  // Se estiver na view de secretarias, mostrar o gerenciador
+  if (showSecretariasManager) {
+    return <SecretariasManager onBack={() => setShowSecretariasManager(false)} />;
+  }
+
   return (
     <div className="space-y-6">
       <JardimBreadcrumb items={[{ label: 'Critérios' }]} />
@@ -315,10 +322,16 @@ export const CriteriosList = ({
                 </Button>
 
                 {isAdmin && (
-                  <Button onClick={() => setShowForm(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Novo Critério
-                  </Button>
+                  <>
+                    <Button onClick={() => setShowSecretariasManager(true)} variant="outline">
+                      <Building2 className="h-4 w-4 mr-2" />
+                      Secretarias
+                    </Button>
+                    <Button onClick={() => setShowForm(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Novo Critério
+                    </Button>
+                  </>
                 )}
               </div>
             </div>

@@ -1267,7 +1267,7 @@ function AppContent() {
         </div>
       </main>
 
-      <JardimFooter />
+      <JardimFooter onNavigate={handleViewChange} />
       <RecoveryNotification />
       <AlertSystemStatus isActive={true} />
       

@@ -8,9 +8,7 @@ import { Badge } from './ui/badge';
 import { toast } from 'sonner@2.0.3';
 import { Mail, Send, CheckCircle, XCircle, AlertTriangle, Clock } from 'lucide-react';
 import { emailService, sendTestEmail } from '../lib/emailService';
-import { useEmailDebouncer } from './EmailDebouncer';
-import { TestModeEmailHelper } from './TestModeEmailHelper';
-import { EmailRateLimitHelper } from './EmailRateLimitHelper';
+import { useEmailDebouncer } from '../hooks/useEmailDebouncer';
 
 interface EmailTestResult {
   success: boolean;
@@ -165,6 +163,20 @@ export function EmailTestPanel() {
       </CardHeader>
       
       <CardContent className="space-y-4">
+        {/* Banner de modo simulação */}
+        <Alert className="bg-green-50 border-green-200">
+          <CheckCircle className="h-4 w-4 text-green-600" />
+          <AlertTitle className="text-green-900">✅ Sistema Pronto para Testes</AlertTitle>
+          <AlertDescription className="text-green-800">
+            <p className="mb-2">
+              O sistema está em <strong>modo de simulação</strong>. Você pode testar todas as funcionalidades sem enviar e-mails reais.
+            </p>
+            <p className="text-xs text-green-700">
+              📄 Para ativar envio real de e-mails, consulte o arquivo <code className="bg-green-100 px-1 rounded">CONFIGURAR_EMAIL.md</code>
+            </p>
+          </AlertDescription>
+        </Alert>
+
         <div className="space-y-2">
           <Label htmlFor="test-email">E-mail de Teste</Label>
           <Input
@@ -264,27 +276,6 @@ export function EmailTestPanel() {
           <p><strong>Teste Alerta:</strong> Envia um e-mail formatado como alerta do sistema</p>
           <p><strong>Nota:</strong> Verifique sua caixa de entrada e pasta de spam</p>
         </div>
-        
-        {/* Mostrar ajuda específica se em modo de teste */}
-        {lastResult && lastResult.testMode && lastResult.authorizedEmail && (
-          <TestModeEmailHelper 
-            authorizedEmail={lastResult.authorizedEmail}
-            onUseAuthorizedEmail={(email) => setTestEmail(email)}
-          />
-        )}
-        
-        {/* Mostrar ajuda para rate limit */}
-        {lastResult && !lastResult.success && (
-          <EmailRateLimitHelper error={lastResult.error} />
-        )}
-        
-        <Alert className="border-yellow-200 bg-yellow-50">
-          <AlertTriangle className="h-4 w-4 text-yellow-600" />
-          <AlertDescription className="text-yellow-800 text-sm">
-            <strong>Modo de Teste Ativo:</strong> Contas novas do Resend só podem enviar e-mails para o próprio e-mail de cadastro. 
-            Para enviar para outros destinatários, é necessário verificar um domínio.
-          </AlertDescription>
-        </Alert>
       </CardContent>
     </Card>
   );

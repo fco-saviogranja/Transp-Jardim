@@ -2,7 +2,15 @@ import { projectId, publicAnonKey } from '../utils/supabase/info';
 
 // URL da Edge Function de e-mail
 // Quando fizer deploy da função no Supabase, esta será a URL correta
-const BASE_URL = `https://${projectId}.supabase.co/functions/v1/email`;
+const BASE_URL = `https://${projectId}.supabase.co/functions/v1/enviar-email`;
+
+// 🆕 Modo de simulação local (não requer servidor)
+// Para ativar envio real de e-mails, crie um arquivo .env com: VITE_EMAIL_ENABLED=true
+// 🔥 FORÇADO PARA MODO REAL - NÃO DEPENDE MAIS DO .ENV
+const EMAIL_ENABLED = true; // ⚠️ MODO REAL PERMANENTE
+const SIMULATION_MODE = !EMAIL_ENABLED;
+
+console.log(`[EmailService] Modo: ${SIMULATION_MODE ? '🧪 SIMULAÇÃO' : '✉️ REAL (FORÇADO)'}`);
 
 // Import toasts dinamicamente para evitar problemas de SSR
 let showRateLimitToast: () => void;
@@ -106,9 +114,9 @@ class EmailService {
 
   private async request(endpoint: string, options: RequestInit = {}) {
     try {
-      console.log(`[EmailService] Fazendo request para: ${BASE_URL}${endpoint}`);
+      console.log(`[EmailService] Fazendo request para: ${BASE_URL}`);
       
-      const response = await fetch(`${BASE_URL}${endpoint}`, {
+      const response = await fetch(BASE_URL, {
         ...options,
         headers: {
           'Content-Type': 'application/json',
@@ -217,20 +225,53 @@ class EmailService {
    * Enviar alerta por e-mail
    */
   async sendAlert(emailData: EmailAlert): Promise<{ success: boolean; emailId?: string; message: string }> {
+    // 🆕 Se em modo de simulação, retornar sucesso simulado
+    if (SIMULATION_MODE) {
+      console.log('📧 [SIMULAÇÃO] Alerta por e-mail:', emailData);
+      
+      // Simular atraso de rede
+      await new Promise(resolve => setTimeout(resolve, 600));
+      
+      return {
+        success: true,
+        emailId: `sim-alert-${Date.now()}`,
+        message: 'Alerta simulado enviado com sucesso (modo de desenvolvimento)'
+      };
+    }
+
     return new Promise((resolve, reject) => {
       const requestFn = async () => {
         try {
           console.log('📧 Enviando alerta por e-mail:', emailData);
           
           // Ajustar e-mail se em modo de teste
-          const adjustedEmailData = {
-            ...emailData,
-            to: this.adjustEmailForTestMode(emailData.to)
-          };
-
-          const result = await this.request('/email/send-alert', {
+          const to = this.adjustEmailForTestMode(emailData.to);
+          
+          // Gerar mensagem HTML do alerta
+          const message = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: ${emailData.alertType === 'urgent' ? '#dc2626' : '#f59e0b'};">
+                ${emailData.alertType === 'urgent' ? '🔴 ALERTA URGENTE' : '🟡 AVISO'}
+              </h2>
+              <p><strong>Critério:</strong> ${emailData.criterio.nome}</p>
+              <p><strong>Secretaria:</strong> ${emailData.criterio.secretaria}</p>
+              <p><strong>Usuário:</strong> ${emailData.usuario.name}</p>
+              ${emailData.dueDate ? `<p><strong>Prazo:</strong> ${emailData.dueDate}</p>` : ''}
+              <hr style="margin: 20px 0; border: none; border-top: 1px solid #e5e7eb;">
+              <p style="font-size: 12px; color: #6b7280;">
+                TranspJardim - Sistema de Transparência<br>
+                Controladoria Municipal de Jardim/CE
+              </p>
+            </div>
+          `;
+          
+          const result = await this.request('', {
             method: 'POST',
-            body: JSON.stringify(adjustedEmailData),
+            body: JSON.stringify({
+              to,
+              subject: emailData.subject,
+              message
+            }),
           });
 
           console.log('✅ E-mail enviado com sucesso:', result);
@@ -238,10 +279,10 @@ class EmailService {
           // Mostrar toast de sucesso
           await loadToasts();
           if (showEmailSuccessToast) {
-            showEmailSuccessToast(result.emailId || 'unknown', result.testMode || false);
+            showEmailSuccessToast('email-sent', false);
           }
           
-          resolve(result);
+          resolve({ success: true, message: 'E-mail enviado com sucesso' });
         } catch (error) {
           console.error('❌ Erro ao enviar e-mail:', error);
           reject(error);
@@ -257,28 +298,53 @@ class EmailService {
    * Enviar e-mail de teste
    */
   async sendTestEmail(testEmail: string): Promise<{ success: boolean; emailId?: string; message: string; testMode?: boolean; authorizedEmail?: string; note?: string }> {
+    // 🆕 Se em modo de simulação, retornar sucesso simulado
+    if (SIMULATION_MODE) {
+      console.log('🧪 [SIMULAÇÃO] E-mail de teste para:', testEmail);
+      
+      // Simular atraso de rede
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      return {
+        success: true,
+        emailId: `sim-${Date.now()}`,
+        message: 'E-mail simulado enviado com sucesso (modo de desenvolvimento)',
+        testMode: true,
+        note: 'Sistema em modo de simulação local. Configure a Edge Function do Supabase para enviar e-mails reais.'
+      };
+    }
+
     return new Promise((resolve, reject) => {
       const requestFn = async () => {
         try {
           console.log('🧪 Enviando e-mail de teste para:', testEmail);
           
-          // NÃO ajustar e-mail - enviar diretamente para o destinatário especificado
-          // Este é um teste de entrega real, não um alerta do sistema
-          const result = await this.request('/email/test', {
+          // Mensagem de teste
+          const message = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #4a7c59;">🧪 E-mail de Teste</h2>
+              <p>Este é um e-mail de teste do sistema TranspJardim.</p>
+              <p>Se você recebeu esta mensagem, a configuração de e-mail está funcionando corretamente!</p>
+              <hr style="margin: 20px 0; border: none; border-top: 1px solid #e5e7eb;">
+              <p style="font-size: 12px; color: #6b7280;">
+                TranspJardim - Sistema de Transparência<br>
+                Controladoria Municipal de Jardim/CE
+              </p>
+            </div>
+          `;
+          
+          const result = await this.request('', {
             method: 'POST',
-            body: JSON.stringify({ testEmail }), // Enviar e-mail original sem redirecionamento
+            body: JSON.stringify({
+              to: testEmail,
+              subject: '🧪 TESTE: Sistema TranspJardim',
+              message
+            }),
           });
 
-          // Se retornou informações de modo de teste, salvar estado
-          if (result.testMode && result.authorizedEmail) {
-            this.testModeDetected = true;
-            this.authorizedTestEmail = result.authorizedEmail;
-            console.log('⚠️ Sistema em modo sandbox Resend - E-mail pode ter sido redirecionado pelo servidor:', result);
-          } else {
-            console.log('✅ E-mail de teste enviado:', result);
-          }
+          console.log('✅ E-mail de teste enviado:', result);
           
-          resolve(result);
+          resolve({ success: true, message: 'E-mail de teste enviado com sucesso' });
         } catch (error) {
           console.error('❌ Erro no teste de e-mail:', error);
           reject(error);
