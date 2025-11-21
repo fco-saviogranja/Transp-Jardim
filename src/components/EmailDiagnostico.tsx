@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from './ui/alert';
 import { Badge } from './ui/badge';
 import { CheckCircle2, XCircle, AlertCircle, Loader2, Mail, Server, Key, Send } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { getEmailStatus } from '../lib/emailService';
 
 interface DiagnosticResult {
   step: string;
@@ -28,14 +29,19 @@ export function EmailDiagnostico() {
     setResults([]);
 
     try {
-      // PASSO 1: Verificar variável de ambiente
+      // PASSO 1: Verificar configuração do emailService (não .env)
+      const emailStatus = getEmailStatus();
       addResult({
-        step: '1. Variável de Ambiente',
-        status: import.meta.env?.VITE_EMAIL_ENABLED === 'true' ? 'success' : 'warning',
-        message: import.meta.env?.VITE_EMAIL_ENABLED === 'true' 
-          ? 'VITE_EMAIL_ENABLED está ativado' 
-          : 'Sistema em modo SIMULAÇÃO (VITE_EMAIL_ENABLED não está true)',
-        details: { value: import.meta.env?.VITE_EMAIL_ENABLED }
+        step: '1. Configuração de E-mail',
+        status: emailStatus.enabled ? 'success' : 'warning',
+        message: emailStatus.enabled 
+          ? '✅ Sistema configurado para MODO REAL (forçado no código)' 
+          : '⚠️ Sistema em modo SIMULAÇÃO',
+        details: { 
+          enabled: emailStatus.enabled,
+          simulationMode: emailStatus.simulationMode,
+          source: 'emailService (código)'
+        }
       });
 
       // PASSO 2: Verificar URL da Edge Function
@@ -89,16 +95,22 @@ export function EmailDiagnostico() {
             details: { 
               status: testResponse.status,
               statusText: testResponse.statusText,
-              response: responseData 
+              response: responseData,
+              solution: 'Verifique os Secrets (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS) no Supabase Dashboard'
             }
           });
         }
       } catch (error: any) {
+        // Erro de fetch = Edge Function não existe
         addResult({
           step: '3. Teste de Envio',
           status: 'error',
-          message: `❌ Erro ao conectar com Edge Function: ${error.message}`,
-          details: { error: error.toString() }
+          message: `❌ A Edge Function não foi criada no Supabase`,
+          details: { 
+            error: error.message,
+            edgeFunctionUrl,
+            solution: 'Siga o guia "⚠️ Configuração Necessária: Edge Function" acima para criar a função'
+          }
         });
       }
 

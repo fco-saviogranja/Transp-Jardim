@@ -159,7 +159,7 @@ class EmailService {
           console.log('[EmailService] Detectado modo de teste do Resend - API Key válida');
           
           // Extrair o e-mail autorizado da mensagem
-          const emailMatch = data.message.match(/\(([^)]+)\)/);
+          const emailMatch = data.message.match(/\\(([^)]+)\\)/);
           const authorizedEmail = emailMatch ? emailMatch[1] : 'seu e-mail de cadastro';
           
           // Salvar informações do modo de teste
@@ -190,13 +190,42 @@ class EmailService {
       
       return data;
     } catch (error) {
-      console.error('[EmailService] Erro na requisição:', error);
-      
+      // Não logar como erro crítico se for "Failed to fetch" (Edge Function não existe)
       if (error instanceof TypeError && error.message.includes('fetch')) {
+        console.log('ℹ️ [EmailService] Edge Function não está acessível (esperado se não foi criada ainda)');
         throw new Error('Erro de conectividade: Não foi possível conectar ao servidor');
       }
       
+      // Para outros erros, logar normalmente
+      console.error('[EmailService] Erro na requisição:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Verificar se a Edge Function está disponível
+   */
+  async checkEdgeFunctionAvailability(): Promise<{ available: boolean; error?: string }> {
+    try {
+      const response = await fetch(`${BASE_URL}/status`, {
+        method: 'GET', // Usar GET na rota /status
+        headers: {
+          'Authorization': `Bearer ${publicAnonKey}`,
+        },
+      });
+      
+      // Se retornou qualquer resposta (mesmo erro), a função existe
+      return { available: true };
+    } catch (error) {
+      // Se deu erro de fetch, a função não existe
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        return { 
+          available: false, 
+          error: 'Edge Function não foi criada ainda' 
+        };
+      }
+      
+      return { available: true }; // Outros erros significam que a função existe
     }
   }
 
@@ -319,32 +348,29 @@ class EmailService {
         try {
           console.log('🧪 Enviando e-mail de teste para:', testEmail);
           
-          // Mensagem de teste
-          const message = `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h2 style="color: #4a7c59;">🧪 E-mail de Teste</h2>
-              <p>Este é um e-mail de teste do sistema TranspJardim.</p>
-              <p>Se você recebeu esta mensagem, a configuração de e-mail está funcionando corretamente!</p>
-              <hr style="margin: 20px 0; border: none; border-top: 1px solid #e5e7eb;">
-              <p style="font-size: 12px; color: #6b7280;">
-                TranspJardim - Sistema de Transparência<br>
-                Controladoria Municipal de Jardim/CE
-              </p>
-            </div>
-          `;
-          
-          const result = await this.request('', {
+          // Usar a rota /test da Edge Function
+          const response = await fetch(`${BASE_URL}/test`, {
             method: 'POST',
-            body: JSON.stringify({
-              to: testEmail,
-              subject: '🧪 TESTE: Sistema TranspJardim',
-              message
-            }),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${publicAnonKey}`,
+            },
+            body: JSON.stringify({ testEmail }),
           });
+
+          const result = await response.json();
+
+          if (!response.ok) {
+            throw new Error(result.error || `HTTP ${response.status}`);
+          }
 
           console.log('✅ E-mail de teste enviado:', result);
           
-          resolve({ success: true, message: 'E-mail de teste enviado com sucesso' });
+          resolve({ 
+            success: true, 
+            message: result.message || 'E-mail de teste enviado com sucesso',
+            emailId: result.emailId
+          });
         } catch (error) {
           console.error('❌ Erro no teste de e-mail:', error);
           reject(error);
@@ -490,3 +516,10 @@ export const getEmailLogs = () => emailService.getEmailLogs();
 export const validateEmailConfig = () => emailService.validateEmailConfig();
 export const testTemporaryApiKey = (apiKey: string) => emailService.testTemporaryApiKey(apiKey);
 export const getTestModeInfo = () => emailService.isInTestMode();
+
+// Exportar status de configuração de e-mail
+export const getEmailStatus = () => ({
+  enabled: EMAIL_ENABLED,
+  simulationMode: SIMULATION_MODE,
+  baseUrl: BASE_URL
+});

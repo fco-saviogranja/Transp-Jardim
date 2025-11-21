@@ -109,22 +109,12 @@ export function useEmailStatus(): EmailStatusHook {
     }
   }, []);
 
-  // Verificação inicial - usar ref para evitar loops
+  // Verificação inicial - DESABILITADA para evitar erros quando Edge Function não existe
+  // Agora só verifica quando o usuário clicar manualmente
   useEffect(() => {
-    let mounted = true;
-    
-    const performInitialCheck = async () => {
-      if (mounted && !lastCheck) {
-        await checkStatus();
-      }
-    };
-    
-    performInitialCheck();
-    
-    return () => {
-      mounted = false;
-    };
-  }, []); // Dependência vazia para executar apenas uma vez
+    // Não fazer verificação automática
+    console.log('ℹ️ [useEmailStatus] Verificação automática desabilitada. Use checkStatus() manualmente.');
+  }, []);
 
   const isConfigured = status === 'configured';
 

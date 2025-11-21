@@ -41,6 +41,27 @@ export function EmailTestPanel() {
     setIsTesting(true);
     setLastResult(null);
 
+    // 🆕 Verificar se a Edge Function existe ANTES de tentar enviar
+    const availability = await emailService.checkEdgeFunctionAvailability();
+    
+    if (!availability.available) {
+      setIsTesting(false);
+      
+      const errorResult: EmailTestResult = {
+        success: false,
+        error: '⚠️ A Edge Function ainda não foi criada no Supabase',
+        timestamp: new Date().toISOString()
+      };
+      
+      setLastResult(errorResult);
+      
+      toast.error('Edge Function não configurada', {
+        description: 'Siga o guia "Configuração Necessária" acima para criar a Edge Function no Supabase.'
+      });
+      
+      return;
+    }
+
     await executeWithDebounce(
       async () => {
         console.log('🧪 [EmailTestPanel] Iniciando teste rápido de e-mail...');
@@ -81,7 +102,17 @@ export function EmailTestPanel() {
           };
           
           setLastResult(testResult);
-          toast.error(`❌ Falha no teste: ${testResult.error}`);
+          
+          // Mensagem amigável para erro de conectividade
+          if (error.message.includes('conectividade')) {
+            toast.error('Não foi possível conectar', {
+              description: 'Verifique se a Edge Function foi criada no Supabase.'
+            });
+          } else {
+            toast.error('Erro ao enviar e-mail', {
+              description: error.message
+            });
+          }
         }
       }
     );

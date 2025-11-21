@@ -1,6 +1,7 @@
 import { EmailTestPanel } from './EmailTestPanel';
 import { EmailDiagnostico } from './EmailDiagnostico';
 import { EnvDebugger } from './EnvDebugger';
+import { EdgeFunctionSetupGuide } from './EdgeFunctionSetupGuide';
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
@@ -435,6 +436,9 @@ export function AdminPanel({ onNavigate, onRestoreDefaults, currentUser }: Admin
 
       {/* Debug de Variáveis de Ambiente */}
       <EnvDebugger />
+
+      {/* Guia de Configuração da Edge Function */}
+      <EdgeFunctionSetupGuide />
 
       {/* Seção de Testes de E-mail e Diagnóstico */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

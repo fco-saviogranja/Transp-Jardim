@@ -1401,6 +1401,10 @@
     border-color: var(--color-amber-200);
   }
 
+  .border-amber-500 {
+    border-color: var(--color-amber-500);
+  }
+
   .border-blue-200 {
     border-color: var(--color-blue-200);
   }
@@ -1425,12 +1429,26 @@
     border-color: var(--color-green-300);
   }
 
+  .border-green-500 {
+    border-color: var(--color-green-500);
+  }
+
   .border-input {
     border-color: var(--input);
   }
 
   .border-orange-200 {
     border-color: var(--color-orange-200);
+  }
+
+  .border-primary\/20 {
+    border-color: var(--primary);
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .border-primary\/20 {
+      border-color: color-mix(in oklab, var(--primary) 20%, transparent);
+    }
   }
 
   .border-primary\/50 {
@@ -2068,6 +2086,10 @@
 
   .break-words {
     overflow-wrap: break-word;
+  }
+
+  .break-all {
+    word-break: break-all;
   }
 
   .hyphens-auto {

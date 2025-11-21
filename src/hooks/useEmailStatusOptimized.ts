@@ -53,36 +53,19 @@ export function useEmailStatus(): EmailStatusHook {
     setError(null);
     
     try {
-      console.log('🔍 [useEmailStatus] Verificando configuração da API Key...');
+      console.log('🔍 [useEmailStatus] Verificando configuração de e-mail via emailService...');
       
-      // Verificar apenas se a API key está configurada, sem enviar email de teste
-      const { projectId, publicAnonKey } = await import('../utils/supabase/info');
-      
-      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-225e1157/email/check-config`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${publicAnonKey}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      const result = await response.json();
+      // Usar o emailService para verificar status (tenta enviar e-mail de teste)
+      const result = await emailService.sendTestEmail('status-check@local.test');
 
       if (!mountedRef.current) return;
 
-      if (response.ok && result.configured) {
-        globalEmailStatus = 'configured';
-        setStatus('configured');
-        globalError = null;
-        setError(null);
-        console.log('✅ [useEmailStatus] API Key configurada');
-      } else {
-        globalEmailStatus = 'not_configured';
-        setStatus('not_configured');
-        globalError = result.error || 'API Key não configurada';
-        setError(globalError);
-        console.log('⚠️ [useEmailStatus] API Key não configurada');
-      }
+      // Se chegou aqui com sucesso, está configurado
+      globalEmailStatus = 'configured';
+      setStatus('configured');
+      globalError = null;
+      setError(null);
+      console.log('✅ [useEmailStatus] Sistema de e-mail configurado');
       
       globalLastCheck = new Date();
       setLastCheck(globalLastCheck);
@@ -90,12 +73,23 @@ export function useEmailStatus(): EmailStatusHook {
     } catch (error) {
       if (!mountedRef.current) return;
       
-      console.log('🔍 [useEmailStatus] Erro ao verificar configuração:', error);
+      console.log('🔍 [useEmailStatus] Erro ao verificar configuração (esperado se Edge Function não existir)');
       
-      globalEmailStatus = 'not_configured';
-      setStatus('not_configured');
-      globalError = 'Não foi possível verificar a configuração de e-mail';
-      setError(globalError);
+      // Não logar erro se for "Failed to fetch" (Edge Function não existe ainda)
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      if (errorMessage.includes('Failed to fetch') || errorMessage.includes('conectividade')) {
+        globalEmailStatus = 'not_configured';
+        setStatus('not_configured');
+        globalError = 'Edge Function não configurada';
+        setError(globalError);
+        console.log('ℹ️ [useEmailStatus] Edge Function não existe ou não está acessível');
+      } else {
+        globalEmailStatus = 'not_configured';
+        setStatus('not_configured');
+        globalError = 'Não foi possível verificar a configuração de e-mail';
+        setError(globalError);
+      }
       
       globalLastCheck = new Date();
       setLastCheck(globalLastCheck);
