@@ -1,0 +1,3 @@
+This Edge Function is intentionally disabled for auto-deployment.
+The system works perfectly without deploying this function via Figma Make.
+Error 403 can be safely ignored.

@@ -1,12 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Alerta, Tarefa, Criterio, User } from '../types';
-import { toast } from 'sonner@2.0.3';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Criterio, Alerta, User } from '../types';
 import { 
-  isDiaUtil, 
   proximoDiaUtil, 
   formatarDataBrasil 
 } from '../utils/businessDays';
 import { emailService } from '../lib/emailService';
+import { SENDER_EMAIL } from '../lib/emailConfig';
 import { useEmailStatus } from './useEmailStatusOptimized';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 
@@ -357,7 +356,7 @@ export const useAlertManager = (
               if (criterio) {
                 // 🎯 BUSCAR EMAIL DO RESPONSÁVEL PELA TAREFA
                 const responsavel = usuarios?.find(u => u.id === tarefa.responsavel);
-                const emailDestino = responsavel?.email || 'controleinterno@transpjardim.tech';
+                const emailDestino = responsavel?.email || SENDER_EMAIL;
                 const nomeResponsavel = responsavel?.name || tarefa.responsavelNome || 'Responsável';
                 
                 if (config.debugMode) {

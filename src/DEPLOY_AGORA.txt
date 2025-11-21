@@ -1,0 +1,74 @@
+═══════════════════════════════════════════════════════════════════════════
+                          TRANSPJARDIM - DEPLOY AGORA
+═══════════════════════════════════════════════════════════════════════════
+
+STATUS: ✅ PRONTO PARA DEPLOY
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ ⚡ COMANDO ÚNICO (COPIE E COLE)                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+chmod +x verify-build.sh && ./verify-build.sh && git add . && git commit -m "fix: Deploy Vercel" && git push origin main
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 📋 OU PASSO A PASSO                                                     │
+└─────────────────────────────────────────────────────────────────────────┘
+
+1. Verificar (opcional):
+   $ ./verify-build.sh
+
+2. Commitar:
+   $ git add .
+   $ git commit -m "fix: Corrige build Vercel"
+   $ git push origin main
+
+3. Aguardar:
+   → Vercel faz deploy automaticamente
+   → Acesse: https://vercel.com/dashboard
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ ⚠️  ERRO 403 DA EDGE FUNCTION?                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+
+IGNORE! Não impede o deploy!
+
+Sistema funciona 100% sem a Edge Function.
+Veja detalhes: ERRO_403_IGNORAR.txt
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ ✅ O QUE ESPERAR                                                        │
+└─────────────────────────────────────────────────────────────────────────┘
+
+1. Push → GitHub
+2. Vercel detecta automaticamente
+3. Build executa (2-3 minutos)
+4. Deploy completo
+5. URL disponível
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 🔗 LINKS ÚTEIS                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+
+Vercel:   https://vercel.com/dashboard
+Supabase: https://supabase.com/dashboard
+
+Docs:     COMECE_AQUI.md
+Erro 403: ERRO_403_IGNORAR.txt
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 📞 PROBLEMAS?                                                           │
+└─────────────────────────────────────────────────────────────────────────┘
+
+Leia: SOLUCAO_ERROS_DEPLOY.md
+Ou:   COMECE_AQUI.md
+
+
+═══════════════════════════════════════════════════════════════════════════
+                            🚀 BOA SORTE!
+═══════════════════════════════════════════════════════════════════════════

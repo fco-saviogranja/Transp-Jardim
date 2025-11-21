@@ -1,6 +1,8 @@
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 
-const BASE_URL = `https://${projectId}.supabase.co/functions/v1/make-server-225e1157`;
+// URL da Edge Function de e-mail
+// Quando fizer deploy da função no Supabase, esta será a URL correta
+const BASE_URL = `https://${projectId}.supabase.co/functions/v1/email`;
 
 // Import toasts dinamicamente para evitar problemas de SSR
 let showRateLimitToast: () => void;

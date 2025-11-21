@@ -46,7 +46,7 @@ export function JardimFooter() {
               </div>
               <div className="flex items-center space-x-3">
                 <Mail className="h-4 w-4 opacity-75" />
-                <span className="opacity-90">controleinterno@transpjardim.tech</span>
+                <span className="opacity-90">controleinterno@transpjardim.com</span>
               </div>
               <div className="flex items-center space-x-3">
                 <Clock className="h-4 w-4 opacity-75" />

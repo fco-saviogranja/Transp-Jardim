@@ -14,6 +14,7 @@
         'react-resizable-panels@2.1.7': 'react-resizable-panels',
         'react-hook-form@7.55.0': 'react-hook-form',
         'react-day-picker@8.10.1': 'react-day-picker',
+        'nodemailer@6.9.7': 'nodemailer',
         'lucide-react@0.487.0': 'lucide-react',
         'input-otp@1.4.2': 'input-otp',
         'figma:asset/f6a9869d371560fae8a34486a3ae60bdf404d376.png': path.resolve(__dirname, './src/assets/f6a9869d371560fae8a34486a3ae60bdf404d376.png'),
@@ -23,7 +24,6 @@
         'embla-carousel-react@8.6.0': 'embla-carousel-react',
         'cmdk@1.1.1': 'cmdk',
         'class-variance-authority@0.7.1': 'class-variance-authority',
-        '@supabase/supabase-js@2': '@supabase/supabase-js',
         '@radix-ui/react-tooltip@1.1.8': '@radix-ui/react-tooltip',
         '@radix-ui/react-toggle@1.1.2': '@radix-ui/react-toggle',
         '@radix-ui/react-toggle-group@1.1.2': '@radix-ui/react-toggle-group',
@@ -56,7 +56,6 @@
     build: {
       target: 'esnext',
       outDir: 'build',
-      chunkSizeWarningLimit: 2500
     },
     server: {
       port: 3000,

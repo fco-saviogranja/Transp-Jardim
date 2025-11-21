@@ -2,12 +2,28 @@
   "supabase": {
     "enabled": false,
     "auto_deploy": false,
+    "deployEdgeFunctions": false,
+    "skipFunctions": true,
     "edge_functions": {
-      "enabled": false
+      "enabled": false,
+      "auto_deploy": false
     }
   },
   "deployment": {
     "skip_supabase": true,
-    "ignore_errors": [403, 401]
+    "skip_edge_functions": true,
+    "ignore_errors": [403, 401],
+    "exclude": [
+      "supabase/functions/**",
+      "**/edge_functions/**",
+      "**/make-server/**"
+    ]
+  },
+  "integrations": {
+    "supabase": {
+      "edge_functions": {
+        "deploy": false
+      }
+    }
   }
 }

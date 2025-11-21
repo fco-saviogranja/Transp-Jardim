@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner@2.0.3';
+import { ADMIN_EMAIL, ALERTS_EMAIL, SENDER_EMAIL } from '../lib/emailConfig';
 
 export interface SystemConfig {
   // Configurações Gerais
@@ -43,13 +44,13 @@ export interface SystemConfig {
 export const defaultConfig: SystemConfig = {
   siteName: 'TranspJardim',
   siteDescription: 'Plataforma de Transparência Municipal de Jardim/CE',
-  adminEmail: 'admin@transpjardim.tech',
+  adminEmail: ADMIN_EMAIL,
   timezone: 'America/Fortaleza',
   defaultLanguage: 'pt-BR',
   
   emailNotifications: true,
   pushNotifications: true,
-  alertsEmail: 'alertas@transpjardim.tech',
+  alertsEmail: ALERTS_EMAIL,
   notificationFrequency: 'daily',
   
   sessionTimeout: 480, // 8 horas em minutos

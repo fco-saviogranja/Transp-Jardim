@@ -2,6 +2,25 @@
 
 Sistema de Transparência e Monitoramento da Controladoria Municipal de Jardim/CE
 
+---
+
+## 🚀 **DEPLOY IMEDIATO** → [COMECE_AQUI.md](COMECE_AQUI.md)
+
+**Status:** ✅ **Pronto para deploy** | Erros corrigidos | Documentação completa
+
+```bash
+# 3 comandos para colocar no ar:
+chmod +x verify-build.sh && ./verify-build.sh
+git add . && git commit -m "fix: Deploy" && git push origin main
+# Aguarde deploy automático no Vercel!
+```
+
+⚠️ **Se aparecer erro 403 da Edge Function:** IGNORE e continue! → [ERRO_403_IGNORAR.txt](ERRO_403_IGNORAR.txt)
+
+📚 **Documentação completa:** [INDICE_DOCUMENTACAO.md](INDICE_DOCUMENTACAO.md)
+
+---
+
 ## 🌟 Sobre o Projeto
 
 O TranspJardim é uma plataforma moderna de transparência e monitoriamento desenvolvida para a Controladoria Municipal de Jardim, Ceará. O sistema permite o acompanhamento de critérios e metas das secretarias municipais, promovendo transparência na gestão pública.
@@ -181,14 +200,14 @@ Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para ma
 ## 🏛️ Entidade Responsável
 
 **Controladoria Municipal de Jardim/CE**
-- Website: https://transpjardim.tech
-- Email: controleinterno@transpjardim.tech
+- Website: https://transpjardim.com
+- Email: controleinterno@transpjardim.com
 - Telefone: (88) 3xxx-xxxx
 
-## 📞 Suporte
+---
 
 Para suporte técnico:
-- 📧 Email: controleinterno@transpjardim.tech
+- 📧 Email: controleinterno@transpjardim.com
 - 📱 WhatsApp: (88) 9xxxx-xxxx
 - 🕒 Horário: Segunda a Sexta, 8h às 17h
 

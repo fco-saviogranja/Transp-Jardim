@@ -1,0 +1,10 @@
+{
+  "deploy": {
+    "edgeFunctions": false,
+    "skipFunctions": true,
+    "excludePaths": [
+      "supabase/functions/**",
+      "**/edge_functions/**"
+    ]
+  }
+}

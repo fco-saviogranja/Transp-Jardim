@@ -1,11 +1,17 @@
 {
-  "buildCommand": "echo 'Build complete'",
+  "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "ignoreCommand": "exit 0",
+  "installCommand": "npm ci",
+  "framework": null,
   "functions": {
     "supabase/functions/**": {
       "memory": 128,
       "maxDuration": 10
+    }
+  },
+  "build": {
+    "env": {
+      "NODE_VERSION": "18"
     }
   }
 }

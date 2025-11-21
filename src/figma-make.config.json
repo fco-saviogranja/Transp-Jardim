@@ -1,0 +1,11 @@
+{
+  "supabase": {
+    "deployEdgeFunctions": false,
+    "skipAutoDetection": true
+  },
+  "deploy": {
+    "exclude": [
+      "supabase/functions/**"
+    ]
+  }
+}

@@ -45,13 +45,13 @@ export const useAuthProvider = () => {
 
   const login = async (username: string, password: string): Promise<boolean> => {
     try {
-      console.log(`Tentando login para usuário: ${username}`);
+      console.log(`🔐 Tentando login para usuário: ${username}`);
       
-      // Sempre tentar autenticação mock primeiro (mais confiável e rápida)
+      // SEMPRE usar autenticação local (não tentar backend)
       const validatedUser = validateLogin(username, password);
       
       if (validatedUser) {
-        console.log(`✅ Login mock bem-sucedido para: ${username}`);
+        console.log(`✅ Login bem-sucedido para: ${username}`);
         const newToken = generateMockToken(validatedUser);
         
         setUser(validatedUser);
@@ -74,82 +74,24 @@ export const useAuthProvider = () => {
         return true;
       }
       
-      // Se mock falhou, tentar Supabase apenas se online
-      if (navigator.onLine) {
-        console.log(`🔄 Login mock falhou, tentando Supabase para: ${username}`);
-        try {
-          const supabaseResponse = await supabase.login(username, password);
-          
-          if (supabaseResponse.success && supabaseResponse.data) {
-            console.log(`✅ Login Supabase bem-sucedido para: ${username}`);
-            const { user: supabaseUser, token: supabaseToken } = supabaseResponse.data;
-            
-            setUser(supabaseUser);
-            setToken(supabaseToken);
-            setStoredAuth(supabaseUser, supabaseToken);
-            
-            return true;
-          }
-        } catch (supabaseError) {
-          console.warn('⚠️ Erro no Supabase, continuando com mock apenas:', supabaseError);
-          
-          // Criação de usuário dinâmico simplificada para evitar timeouts
-          if (supabaseError.message?.includes('não encontrado')) {
-            console.log(`🔄 Tentando criar usuário dinâmico: ${username}`);
-            
-            // Processo assíncrono para não bloquear
-            setTimeout(() => {
-              try {
-                const newUser = {
-                  id: `dynamic_${Date.now()}`,
-                  username: username,
-                  name: username.charAt(0).toUpperCase() + username.slice(1),
-                  role: 'padrão' as const,
-                  email: `${username}@transpjardim.tech`,
-                  secretaria: 'Secretaria de Administração e Finanças',
-                  dataCriacao: new Date().toISOString()
-                };
-                
-                // Operações localStorage otimizadas
-                const existingUsers = JSON.parse(localStorage.getItem('transpjardim_dynamic_users') || '[]');
-                localStorage.setItem('transpjardim_dynamic_users', JSON.stringify([...existingUsers, newUser]));
-                
-                const existingPasswords = JSON.parse(localStorage.getItem('transpjardim_user_passwords') || '{}');
-                existingPasswords[username] = password;
-                localStorage.setItem('transpjardim_user_passwords', JSON.stringify(existingPasswords));
-                
-                console.log(`✅ Usuário dinâmico criado em background: ${username}`);
-              } catch (error) {
-                console.warn('Erro ao criar usuário dinâmico em background:', error);
-              }
-            }, 0);
-          }
-        }
-      } else {
-        console.log('📱 Sem conexão, usando apenas validação mock');
-      }
+      console.log(`❌ Credenciais inválidas para: ${username}`);
       
-      console.log(`❌ Falha na autenticação para: ${username}`);
+      // Mostrar toast de erro
+      requestAnimationFrame(async () => {
+        try {
+          const { toast } = await import('sonner@2.0.3');
+          toast.error('❌ Credenciais inválidas', {
+            description: 'Usuário ou senha incorretos',
+            duration: 3000
+          });
+        } catch {
+          // Ignorar erro de toast
+        }
+      });
+      
       return false;
     } catch (error) {
       console.error('❌ Erro crítico no login:', error);
-      
-      // Sempre tentar mock como último recurso
-      console.log(`🚨 Erro crítico, usando mock de emergência para: ${username}`);
-      const validatedUser = validateLogin(username, password);
-      
-      if (validatedUser) {
-        console.log(`✅ Login de emergência bem-sucedido para: ${username}`);
-        const newToken = generateMockToken(validatedUser);
-        
-        setUser(validatedUser);
-        setToken(newToken);
-        setStoredAuth(validatedUser, newToken);
-        
-        return true;
-      }
-      
-      console.log(`❌ Falha completa no login para: ${username}`);
       return false;
     }
   };

@@ -19,6 +19,7 @@ import { SimpleEmailTest } from './SimpleEmailTest';
 import { EmailConfigSimple } from './EmailConfigSimple';
 import { DataCleanupPanel } from './DataCleanupPanel';
 import { DiagnosticBanner } from './DiagnosticBanner';
+import { QuickApiKeySetup } from './QuickApiKeySetup';
 import { useSupabase } from '../hooks/useSupabase';
 import { JardimLogo } from './JardimLogo';
 import { mockCriterios, mockAlertas } from '../lib/mockData';

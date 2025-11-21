@@ -379,7 +379,7 @@ export const UserManagement = ({ currentUserId }: UserManagementProps = {}) => {
         if (result.testMode && result.authorizedEmail) {
           // E-mail foi redirecionado pelo Resend (sandbox mode)
           toast.warning(`⚠️ E-mail redirecionado (Resend Sandbox)`, {
-            description: `O Resend está em modo sandbox. E-mail enviado para ${result.authorizedEmail} em vez de ${user.email}. Configure o domínio transpjardim.tech no Resend para produção.`,
+            description: `O Resend está em modo sandbox. E-mail enviado para ${result.authorizedEmail} em vez de ${user.email}. Configure o domínio transpjardim.com no Resend para produção.`,
             duration: 8000
           });
         } else {
@@ -400,7 +400,7 @@ export const UserManagement = ({ currentUserId }: UserManagementProps = {}) => {
         // Mensagens específicas por tipo de erro
         if (errorType === 'sandbox-restriction' || errorMsg.includes('sandbox') || errorMsg.includes('Sandbox')) {
           toast.error(`⚠️ Resend em Modo Sandbox`, {
-            description: `${errorDetails || 'A API Key do Resend só pode enviar e-mails para o e-mail cadastrado na conta.'}\n\n✅ Solução: Adicione e verifique o domínio transpjardim.tech no Resend.\n📖 Veja: GUIA_CONFIGURACAO_DOMINIO_RESEND.md`,
+            description: `${errorDetails || 'A API Key do Resend só pode enviar e-mails para o e-mail cadastrado na conta.'}\n\n✅ Solução: Adicione e verifique o domínio transpjardim.com no Resend.\n📖 Veja: GUIA_CONFIGURACAO_DOMINIO_RESEND.md`,
             duration: 10000
           });
         } else if (errorType === 'invalid_api_key' || errorMsg.includes('API Key')) {

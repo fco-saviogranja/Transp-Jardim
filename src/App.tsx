@@ -1,11 +1,12 @@
-import {
-  useState,
-  useEffect,
-  useCallback,
-  useMemo,
-} from "react";
-import { AuthProvider } from "./components/AuthProvider";
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { toast } from 'sonner@2.0.3';
+import { Toaster } from 'sonner@2.0.3';
+import { ImageWithFallback } from "./components/figma/ImageWithFallback";
+import logoRedonda from "figma:asset/f6a9869d371560fae8a34486a3ae60bdf404d376.png";
+import { useAuth } from "./hooks/useAuth";
+import { useAlertManager } from "./hooks/useAlertManager";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { AuthProvider } from "./components/AuthProvider";
 import { LoginForm } from "./components/LoginForm";
 import { JardimHeader } from "./components/JardimHeader";
 import { JardimFooter } from "./components/JardimFooter";
@@ -13,19 +14,12 @@ import { JardimBreadcrumb } from "./components/JardimBreadcrumb";
 import { Dashboard } from "./components/Dashboard";
 import { CriteriosList } from "./components/CriteriosList";
 import { AdvancedAlertsPanel } from "./components/AdvancedAlertsPanel";
-import { AdminPanel } from "./components/AdminPanel";
-import { AdvancedMetrics } from "./components/AdvancedMetrics";
 import { TarefasList } from "./components/TarefasList";
 import { UserCompletionHistory } from "./components/UserCompletionHistory";
-import { Toaster } from "./components/ui/sonner";
-import { toast } from "./utils/toast";
-import { JardimLogo } from "./components/JardimLogo";
+import { AdminPanel } from "./components/AdminPanel";
+import { AdvancedMetrics } from "./components/AdvancedMetrics";
 import { RecoveryNotification } from "./components/RecoveryNotification";
 import { AlertSystemStatus } from "./components/AlertSystemStatus";
-import { ImageWithFallback } from "./components/figma/ImageWithFallback";
-import logoRedonda from "figma:asset/f6a9869d371560fae8a34486a3ae60bdf404d376.png";
-import { useAuth } from "./hooks/useAuth";
-import { useAlertManager } from "./hooks/useAlertManager";
 import {
   mockCriterios,
   mockAlertas,
@@ -560,7 +554,7 @@ function AppContent() {
           throw new Error(result.error || "Erro ao criar critério");
         }
 
-        // Adicionar ao estado local com valores padrão
+        // Adicionar ao estado local com valores padro
         setCriterios((prev) => [...prev, {
           ...result.data,
           valor: result.data.valor ?? 0,
@@ -1276,6 +1270,8 @@ function AppContent() {
       <JardimFooter />
       <RecoveryNotification />
       <AlertSystemStatus isActive={true} />
+      
+      {/* Alerta de API Key removido - sistema funciona 100% local */}
 
       <Toaster />
     </div>

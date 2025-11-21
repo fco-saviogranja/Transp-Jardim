@@ -1,0 +1,11 @@
+# Configuração Supabase - TranspJardim
+# Este arquivo desabilita o deploy automático de Edge Functions
+
+[functions]
+  # Desabilitar deploy automático
+  enabled = false
+
+[functions.server]
+  # Edge Function desabilitada
+  enabled = false
+  verify_jwt = false

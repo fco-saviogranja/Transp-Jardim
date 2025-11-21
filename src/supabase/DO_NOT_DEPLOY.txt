@@ -1,0 +1,10 @@
+⚠️ NÃO FAZER DEPLOY DESTAS EDGE FUNCTIONS
+
+Esta pasta contém Edge Functions que NÃO devem ser deployadas automaticamente.
+
+Motivo: 
+- Requer permissões de administrador do Supabase
+- Deploy manual apenas
+- Figma Make não tem permissões necessárias
+
+Status: DEPLOY DESABILITADO
